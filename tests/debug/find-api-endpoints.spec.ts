@@ -33,7 +33,8 @@ test('find API endpoints from website', async ({ page }) => {
         }
     });
 
-    await page.goto('https://gia-quanh-day.vercel.app/');
+    // await page.goto('https://gia-quanh-day.vercel.app/');
+    await page.goto('https://affree.timdaythay.com/');
 
     await page.waitForTimeout(5000);
 });

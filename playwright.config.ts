@@ -1,4 +1,5 @@
 import { defineConfig } from '@playwright/test';
+import { env } from './utils/env';
 
 export default defineConfig({
   testDir: './tests',
@@ -17,7 +18,7 @@ export default defineConfig({
   ],
 
   use: {
-    baseURL: process.env.BASE_URL || 'https://gia-quanh-day.vercel.app',
+    baseURL: env.BASE_URL || 'https://gia-quanh-day.vercel.app',
     extraHTTPHeaders: {
       Accept: 'application/json',
     },
@@ -38,6 +39,11 @@ export default defineConfig({
       name: 'search-nearby-stores',
       testMatch: /.*search-nearby-stores\.spec\.ts/,
       timeout: 120_000,
+    }, {
+      name: 'flow-order',
+      testMatch: /.*flow-order\.spec\.ts/,
+      timeout: 180_000,
+      workers: 1,
     }
   ],
 });
