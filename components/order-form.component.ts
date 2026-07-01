@@ -42,10 +42,17 @@ export class OrderFormComponent {
     constructor(private readonly page: Page) { }
 
     finalCta(storeCase: OrderStoreCase): Locator {
-        return this.page
+        const dialog = this.page.locator('[role="dialog"]').last();
+        const dialogCta = dialog
+            .getByRole('button', { name: storeCase.finalCta })
+            .or(dialog.getByText(storeCase.finalCta))
+            .first();
+        const pageCta = this.page
             .getByRole('button', { name: storeCase.finalCta })
             .or(this.page.getByText(storeCase.finalCta))
             .first();
+
+        return dialogCta.or(pageCta).last();
     }
 
     async fillStoreForm(

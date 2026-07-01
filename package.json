@@ -7,7 +7,7 @@
     "test": "npx playwright test",
     "test:staging": "cross-env TEST_ENV=staging playwright test",
     "test:demo": "cross-env TEST_ENV=demo playwright test",
-    "test:p0:data": "npx playwright test --project=api-data-contract --grep \"@p0.*@data\"",
+    "test:p0:data": "npx playwright test --project=api-data-contract --grep \"@p0 @contract\"",
     "test:contract": "npx playwright test --project=api-data-contract --grep \"@contract\"",
     "report": "npx playwright show-report reports/html-report"
   },

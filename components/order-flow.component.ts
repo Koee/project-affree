@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { type OrderStoreCase } from '../fixtures/order-store-form.fixture';
+import { selectPreferredAddressSuggestionIndex } from './location.component';
 
 export class OrderFlowComponent {
     constructor(private readonly page: Page) { }
@@ -72,23 +73,72 @@ export class OrderFlowComponent {
 
         await addressInput.fill(address);
 
-        const suggestion = this.page
-            .locator('li button, [role="option"], [data-testid*="address"], [data-testid*="location"]')
-            .filter({
-                hasText: /dong da|đống đa|tan son hoa|tân sơn hòa|ho chi minh|hồ chí minh/i,
-            })
-            .first();
+        const selectedSuggestion = await this.preferredLocationSuggestion(
+            address,
+            addressInput
+        );
 
-        if (await suggestion.isVisible({ timeout: 15_000 }).catch(() => false)) {
-            await suggestion.click({ force: true });
+        if (await selectedSuggestion.isVisible({ timeout: 15_000 }).catch(() => false)) {
+            await selectedSuggestion.click({ force: true });
         }
 
-        await this.closeLocationDropdown(openedBy, suggestion);
+        await this.closeLocationDropdown(openedBy, selectedSuggestion, addressInput);
+    }
+
+    private async preferredLocationSuggestion(
+        address: string,
+        addressInput: Locator
+    ): Promise<Locator> {
+        const overlay = this.page
+            .locator('.fixed.inset-0')
+            .filter({ has: addressInput })
+            .first();
+        const root = (await overlay.isVisible({ timeout: 1_000 }).catch(() => false))
+            ? overlay
+            : this.page.locator('body');
+        const suggestionCandidates = root.locator(
+            'li button, [role="option"], [data-testid*="address"], [data-testid*="location"]'
+        );
+
+        await expect(suggestionCandidates.first())
+            .toBeVisible({ timeout: 15_000 })
+            .catch(() => undefined);
+
+        const visibleSuggestions: Array<{ locator: Locator; text: string }> = [];
+        const suggestionCount = await suggestionCandidates.count();
+
+        for (let index = 0; index < suggestionCount; index += 1) {
+            const suggestion = suggestionCandidates.nth(index);
+            const isVisible = await suggestion.isVisible().catch(() => false);
+
+            if (!isVisible) {
+                continue;
+            }
+
+            const text = (await suggestion.innerText().catch(() => '')).trim();
+
+            if (text) {
+                visibleSuggestions.push({ locator: suggestion, text });
+            }
+        }
+
+        if (visibleSuggestions.length === 0) {
+            return this.page.locator('__missing_location_suggestion__');
+        }
+
+        const selectedSuggestionIndex = selectPreferredAddressSuggestionIndex(
+            visibleSuggestions.map(suggestion => suggestion.text),
+            address,
+            /nguyen trong tuyen|phu nhuan|ho chi minh/i
+        );
+
+        return visibleSuggestions[selectedSuggestionIndex].locator;
     }
 
     private async closeLocationDropdown(
         chooseLocationButton: Locator,
-        suggestion: Locator
+        suggestion: Locator,
+        addressInput: Locator
     ): Promise<void> {
         await this.page.keyboard.press('Escape').catch(() => undefined);
         await this.page.mouse.click(20, 90).catch(() => undefined);
@@ -98,6 +148,47 @@ export class OrderFlowComponent {
         }
 
         await expect(suggestion).toBeHidden({ timeout: 5_000 }).catch(() => undefined);
+
+        const blockingOverlay = this.page
+            .locator('.fixed.inset-0')
+            .filter({ has: addressInput })
+            .first()
+            .or(this.page.locator('header .fixed.inset-0').first())
+            .first();
+
+        if (await blockingOverlay.isVisible({ timeout: 1_000 }).catch(() => false)) {
+            await this.page.keyboard.press('Escape').catch(() => undefined);
+
+            const closeButton = blockingOverlay
+                .getByRole('button', { name: /dong|đóng|close|huy|hủy|x/i })
+                .or(blockingOverlay.locator('button[aria-label], button[title]').first())
+                .or(blockingOverlay.locator('button').first())
+                .first();
+
+            if (await closeButton.isVisible({ timeout: 1_000 }).catch(() => false)) {
+                await closeButton.click({ force: true }).catch(() => undefined);
+            }
+
+            if (await blockingOverlay.isVisible({ timeout: 1_000 }).catch(() => false)) {
+                const panelBox = await blockingOverlay
+                    .locator('div')
+                    .first()
+                    .boundingBox()
+                    .catch(() => undefined);
+
+                if (panelBox) {
+                    await this.page.mouse
+                        .click(panelBox.x + panelBox.width - 28, panelBox.y + 28)
+                        .catch(() => undefined);
+                }
+            }
+
+            if (await blockingOverlay.isVisible({ timeout: 1_000 }).catch(() => false)) {
+                await chooseLocationButton.click({ force: true }).catch(() => undefined);
+            }
+
+            await expect(blockingOverlay).toBeHidden({ timeout: 5_000 }).catch(() => undefined);
+        }
     }
 
     async selectCheapestTab(): Promise<void> {

@@ -48,6 +48,7 @@ export const orderStoreCases: OrderStoreCase[] = [
                 label: /mat khau co\.op|mật khẩu co\.op/i,
                 source: 'coopPassword',
                 kind: 'password',
+                required: true,
                 secret: true,
             },
             {
@@ -57,7 +58,7 @@ export const orderStoreCases: OrderStoreCase[] = [
             },
             { label: /quan\/huyen|quận\/huyện/i, source: 'district', kind: 'select' },
             { label: /phuong\/xa|phường\/xã/i, source: 'ward', kind: 'select' },
-            { label: /so nha|số nhà/i, source: 'houseNumber' },
+            { label: /so nha|số nhà|ten duong|tên đường/i, source: 'houseNumber' },
             { label: /ten duong|tên đường/i, source: 'streetName' },
         ],
     },

@@ -15,13 +15,19 @@ test.describe('@p0 @contract Products Catalog API', () => {
 
         const body = await response.json();
 
-        expect(body).toBeTruthy();
-        expect(body.products).toBeTruthy();
-        expect(Array.isArray(body.products)).toBeTruthy();
-        expect(body.products.length).toBeGreaterThan(0);
+        expect(body, 'GET /api/catalog should return a JSON body').toBeTruthy();
+        expect(body.products, 'GET /api/catalog body should include products').toBeTruthy();
+        expect(
+            Array.isArray(body.products),
+            'GET /api/catalog products should be an array'
+        ).toBeTruthy();
+        expect(
+            body.products.length,
+            'GET /api/catalog products should not be empty'
+        ).toBeGreaterThan(0);
     });
 
-    test('GET /api/catalog should not return duplicate product code', async ({ request }) => {
+    test('GET /api/catalog should not return duplicate product id', async ({ request }) => {
         const api = new ApiClient(request);
 
         const response = await api.getCatalog();
@@ -29,7 +35,7 @@ test.describe('@p0 @contract Products Catalog API', () => {
 
         const body = await response.json();
 
-        expectNoDuplicateByKey(body.products, 'code');
+        expectNoDuplicateByKey(body.products, 'id');
     });
 
     test('GET /api/catalog products should have required fields', async ({ request }) => {
@@ -41,8 +47,8 @@ test.describe('@p0 @contract Products Catalog API', () => {
         const body = await response.json();
 
         for (const product of body.products) {
-            expect(product.code).toBeTruthy();
-            expect(product.name).toBeTruthy();
+            expect(product.id, 'Catalog product should include a truthy id').toBeTruthy();
+            expect(product.name, 'Catalog product should include a truthy name').toBeTruthy();
         }
     });
 });

@@ -1,9 +1,18 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { ApiCrawlRecorder } from '../../../utils/api-crawl-recorder';
 import { generateApiCrawlHtmlReport } from '../../../utils/api-crawl-report';
 
 const BASE_URL = 'https://affree.timdaythay.com/';
 test.setTimeout(120_000);
+
+async function openCrawlerPage(page: Page, url: string): Promise<void> {
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await expect(
+        page.locator('body'),
+        `Expected ${url} to render a body before crawling API calls`
+    ).toBeVisible();
+}
+
 test.describe('@crawl @api Affree API Inventory', () => {
     test('crawl known pages and collect API endpoints', async ({ page }) => {
         const recorder = new ApiCrawlRecorder();
@@ -19,36 +28,34 @@ test.describe('@crawl @api Affree API Inventory', () => {
         ];
 
         for (const route of pagesToCrawl) {
-            await page.goto(`${BASE_URL}${route}`, {
-                waitUntil: 'networkidle',
-            });
-
-            await page.waitForTimeout(1000);
+            await openCrawlerPage(page, `${BASE_URL}${route}`);
         }
 
         /**
          * Trigger search API nếu có search box
          */
-        await page.goto(`${BASE_URL}/search`, {
-            waitUntil: 'networkidle',
-        });
+        await openCrawlerPage(page, `${BASE_URL}/search`);
 
         const searchBox = page
             .locator('input[type="text"], input[placeholder*="Tìm"], input[placeholder*="Search"]')
             .first();
 
         if (await searchBox.count()) {
+            const previousRecordCount = recorder.recordCount;
             await searchBox.fill('sugar');
             await page.keyboard.press('Enter');
-            await page.waitForLoadState('networkidle');
+            await expect
+                .poll(
+                    () => recorder.recordCount,
+                    { message: 'Expected search interaction to trigger an API response' }
+                )
+                .toBeGreaterThan(previousRecordCount);
         }
 
         /**
          * Trigger product/detail flow nếu có product links
          */
-        await page.goto(BASE_URL, {
-            waitUntil: 'networkidle',
-        });
+        await openCrawlerPage(page, BASE_URL);
 
         const productLinks = page.locator('a[href^="/p/"]');
         const productCount = await productLinks.count();
@@ -57,11 +64,7 @@ test.describe('@crawl @api Affree API Inventory', () => {
             const href = await productLinks.nth(i).getAttribute('href');
             if (!href) continue;
 
-            await page.goto(`${BASE_URL}${href}`, {
-                waitUntil: 'networkidle',
-            });
-
-            await page.waitForTimeout(1000);
+            await openCrawlerPage(page, `${BASE_URL}${href}`);
         }
 
         const records = recorder.save();
@@ -82,6 +85,9 @@ test.describe('@crawl @api Affree API Inventory', () => {
             contentType: 'text/html',
         });
 
-        expect(records.length).toBeGreaterThan(0);
+        expect(
+            records.length,
+            'API crawl should capture at least one allowed Affree API response'
+        ).toBeGreaterThan(0);
     });
 });

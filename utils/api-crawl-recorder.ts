@@ -59,6 +59,10 @@ export class ApiCrawlRecorder {
         });
     }
 
+    get recordCount(): number {
+        return this.records.size;
+    }
+
     save() {
         const data = [...this.records.values()];
 

@@ -12,6 +12,17 @@ export type OrderRecipientData = {
     deliveryAddress?: string;
 };
 
+export const OrderReportPrefixFixture: Record<OrderStoreChain, string> = {
+    coop: 'co.op-',
+    bhx: 'bhx-',
+    concung: 'concung-',
+    mlbl: 'mlbl-',
+};
+
+export function getOrderReportPrefix(chain: OrderStoreChain): string {
+    return OrderReportPrefixFixture[chain];
+}
+
 const commonRecipient = {
     receiverName: process.env.ORDER_RECEIVER_NAME || 'Thach',
     phone: process.env.ORDER_RECEIVER_PHONE || '0303050708',
@@ -23,14 +34,17 @@ const defaultDeliveryAddress =
 
 export const OrderRecipientFixture: Record<OrderStoreChain, OrderRecipientData> = {
     coop: {
-        ...commonRecipient,
-        coopPassword: process.env.COOP_PASSWORD,
-        province: process.env.ORDER_COOP_PROVINCE || 'TP. Ho Chi Minh',
-        district: process.env.ORDER_COOP_DISTRICT || 'Quan Tan Binh',
-        ward: process.env.ORDER_COOP_WARD || 'Phuong Tan Son Hoa',
-        houseNumber: process.env.ORDER_COOP_HOUSE_NUMBER || '5',
-        streetName: process.env.ORDER_COOP_STREET_NAME || 'Dong Da',
-        deliveryAddress: defaultDeliveryAddress,
+        receiverName: process.env.ORDER_COOP_RECEIVER_NAME || 'Trách',
+        phone: process.env.ORDER_COOP_RECEIVER_PHONE || '0989346877',
+        coopPassword: process.env.ORDER_COOP_PASSWORD || process.env.COOP_PASSWORD,
+        province: process.env.ORDER_COOP_PROVINCE || 'Thành phố Hồ Chí Minh',
+        district: process.env.ORDER_COOP_DISTRICT || 'Quận Phú Nhuận',
+        ward: process.env.ORDER_COOP_WARD || 'Phường 1',
+        houseNumber: process.env.ORDER_COOP_HOUSE_NUMBER || '246',
+        streetName: process.env.ORDER_COOP_STREET_NAME || 'Nguyễn Trọng Tuyển',
+        deliveryAddress:
+            process.env.ORDER_COOP_DELIVERY_ADDRESS ||
+            '246 Nguyễn Trọng Tuyển, Phường 1, Quận Phú Nhuận, TP.HCM',
     },
     bhx: {
         ...commonRecipient,
