@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource costco {
+  provider = "postgresql"
+  url      = env("DATABASE_URL_COSTCO")
+  directUrl = env("DIRECT_URL_COSTCO")
+}
+
+model CostcoProduct {
+  id        String   @id @default(cuid())
+  sku       String   @unique
+  name      String
+  price     Decimal
+  category  String
+  image     String
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CostcoPriceHistory {
+  id          String   @id @default(cuid())
+  sku         String
+  price       Decimal
+  currency    String   @default("USD")
+  source      String
+  crawlRunId  String?
+  capturedAt  DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([sku])
+  @@index([capturedAt])
+  @@index([crawlRunId])
+}
+
+model CostcoCrawlRun {
+  id             String   @id @default(cuid())
+  source         String
+  status         String
+  productCount   Int      @default(0)
+  errorMessage   String?
+  startedAt      DateTime
+  finishedAt     DateTime?
+  createdAt      DateTime @default(now())
+}

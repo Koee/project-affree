@@ -38,21 +38,37 @@ function labelToPlaceholderPattern(label: RegExp): RegExp {
     return new RegExp(label.source, label.flags.includes('i') ? 'i' : undefined);
 }
 
+function fieldPlaceholderPattern(field: OrderFormField): RegExp {
+    if (field.source === 'phone') {
+        return /so dien thoai|số điện thoại|phone|090|09|vd:\s*0/i;
+    }
+
+    if (field.source === 'deliveryAddress') {
+        return /dia chi|địa chỉ|so nha|số nhà|duong|đường|phuong|phường|quan|quận/i;
+    }
+
+    if (field.source === 'receiverName') {
+        return /nguoi nhan|người nhận|ho va ten|họ và tên|ten nguoi nhan|tên người nhận/i;
+    }
+
+    return labelToPlaceholderPattern(field.label);
+}
+
 export class OrderFormComponent {
     constructor(private readonly page: Page) { }
 
     finalCta(storeCase: OrderStoreCase): Locator {
         const dialog = this.page.locator('[role="dialog"]').last();
-        const dialogCta = dialog
-            .getByRole('button', { name: storeCase.finalCta })
-            .or(dialog.getByText(storeCase.finalCta))
+        const enabledDialogCta = dialog
+            .locator('button:not([disabled]):not([aria-disabled="true"])')
+            .filter({ hasText: storeCase.finalCta })
             .first();
-        const pageCta = this.page
-            .getByRole('button', { name: storeCase.finalCta })
-            .or(this.page.getByText(storeCase.finalCta))
+        const enabledPageCta = this.page
+            .locator('button:not([disabled]):not([aria-disabled="true"])')
+            .filter({ hasText: storeCase.finalCta })
             .first();
 
-        return dialogCta.or(pageCta).last();
+        return enabledDialogCta.or(enabledPageCta).first();
     }
 
     async fillStoreForm(
@@ -154,15 +170,25 @@ export class OrderFormComponent {
     }
 
     private fieldLocator(field: OrderFormField): Locator {
-        const placeholderPattern = labelToPlaceholderPattern(field.label);
+        const placeholderPattern = fieldPlaceholderPattern(field);
+        const controls = 'input, textarea, select, [role="combobox"]';
+        const directControls =
+            ':scope > input, :scope > textarea, :scope > select, :scope > [role="combobox"]';
 
         return this.page
             .getByLabel(field.label)
+            .or(this.page.getByRole('textbox', { name: field.label }))
+            .or(this.page.getByRole('combobox', { name: field.label }))
             .or(this.page.getByPlaceholder(placeholderPattern))
             .or(
                 this.page
-                    .locator('label, div, section', { hasText: field.label })
-                    .locator('input, textarea, [role="combobox"]')
+                    .locator('label', { hasText: field.label })
+                    .locator(controls)
+            )
+            .or(
+                this.page
+                    .locator('div', { hasText: field.label })
+                    .locator(directControls)
             )
             .first();
     }

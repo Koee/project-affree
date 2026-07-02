@@ -24,8 +24,10 @@ import {
 
 const orderProductName = 'Bia Tiger Crystal lốc 6 lon x 330ml';
 const coopProductName = 'Sữa tươi Vinamilk có đường 1L';
+const bhxProductName = 'Trà xanh Không Độ chanh 455ml';
 const mlblAgentWaitMs = Number(process.env.ORDER_AGENT_WAIT_MS || 120_000);
 const coopAgentWaitMs = Number(process.env.ORDER_AGENT_WAIT_MS || 120_000);
+const bhxAgentWaitMs = Number(process.env.ORDER_AGENT_WAIT_MS || 30_000);
 
 async function clickCheapestStoreBuyButton(
     page: Page,
@@ -45,6 +47,7 @@ async function clickCheapestStoreBuyButton(
     await expect(cheapestStoreCard).toBeVisible({ timeout: 30_000 });
 
     await attachImportantScreenshot(testInfo, 'cheapest-store-card', {
+        page,
         locator: cheapestStoreCard,
         prefix: reportPrefix,
     });
@@ -59,6 +62,150 @@ async function clickCheapestStoreBuyButton(
     await attachReportState(page, testInfo, 'after-cheapest-buy-click', {
         prefix: reportPrefix,
     });
+}
+
+async function clickBhxCheapestStoreBuyButton(
+    page: Page,
+    testInfo: TestInfo
+): Promise<void> {
+    const reportPrefix = getOrderReportPrefix('bhx');
+    const cheapestBadge = page
+        .locator('span')
+        .filter({ hasText: /re nhat|rẻ nhất/i });
+    const bhxStoreCard = page
+        .locator('li, article, [data-testid*="store"], [data-testid*="product"], .store-card, .product-card')
+        .filter({ has: cheapestBadge })
+        .filter({ hasText: /bach hoa xanh|bách hóa xanh|bhx/i })
+        .first();
+
+    await expect(bhxStoreCard).toBeVisible({ timeout: 30_000 });
+
+    await attachImportantScreenshot(testInfo, 'cheapest-store-card', {
+        page,
+        locator: bhxStoreCard,
+        prefix: reportPrefix,
+    });
+
+    const buyButton = bhxStoreCard
+        .getByRole('button', { name: /mua ngay|mua|chon mua|chọn mua/i })
+        .or(bhxStoreCard.getByText(/mua ngay|mua|chon mua|chọn mua/i))
+        .first();
+
+    await expect(buyButton).toBeVisible({ timeout: 30_000 });
+    await buyButton.click();
+
+    const formMarker = page
+        .getByText(/nguoi nhan|người nhận|so dien thoai|số điện thoại|de tro ly dat giup|để trợ lý đặt giúp/i)
+        .first();
+
+    if (!(await formMarker.isVisible({ timeout: 3_000 }).catch(() => false))) {
+        const addToCartButton = bhxStoreCard
+            .getByRole('button', { name: /them vao gio|thêm vào giỏ|\+/i })
+            .first();
+
+        if (await addToCartButton.isVisible({ timeout: 3_000 }).catch(() => false)) {
+            await addToCartButton.click({ force: true });
+        }
+    }
+
+    await attachReportState(page, testInfo, 'after-cheapest-buy-click', {
+        prefix: reportPrefix,
+    });
+}
+
+async function selectBhxDeliverySlot(
+    page: Page,
+    recipient: OrderRecipientData
+): Promise<void> {
+    if (!recipient.deliverySlot) {
+        return;
+    }
+
+    const slotPattern = new RegExp(escapeRegExp(recipient.deliverySlot), 'i');
+    const root = page.locator('[role="dialog"]').last().or(page.locator('body')).first();
+    const selectControls = root.locator('select');
+    const selectCount = await selectControls.count();
+
+    for (let index = 0; index < selectCount; index += 1) {
+        const selectControl = selectControls.nth(index);
+        const matchingOptionValue = await selectControl.locator('option').evaluateAll(
+            (options, expectedSlot) => {
+                const expected = String(expectedSlot).toLocaleLowerCase('vi-VN');
+                const match = options.find(option =>
+                    (option.textContent || '')
+                        .toLocaleLowerCase('vi-VN')
+                        .includes(expected)
+                ) as HTMLOptionElement | undefined;
+
+                return match ? match.value : undefined;
+            },
+            recipient.deliverySlot
+        );
+
+        if (!matchingOptionValue) {
+            continue;
+        }
+
+        await selectControl.selectOption(matchingOptionValue);
+        return;
+    }
+
+    const slotControl = root
+        .getByRole('button', { name: slotPattern })
+        .or(root.getByRole('radio', { name: slotPattern }))
+        .or(root.getByRole('option', { name: slotPattern }))
+        .or(root.getByText(slotPattern))
+        .first();
+
+    await expect(slotControl).toBeVisible({ timeout: 30_000 });
+    await slotControl.click({ force: true });
+}
+
+async function selectBhxCheapestDeliveryStore(
+    page: Page,
+    testInfo: TestInfo
+): Promise<void> {
+    const reportPrefix = getOrderReportPrefix('bhx');
+    const dialog = page.locator('[role="dialog"]').last();
+    const root = (await dialog.isVisible({ timeout: 1_000 }).catch(() => false))
+        ? dialog
+        : page.locator('body');
+    const storeSection = root
+        .locator('section, div, ul')
+        .filter({ hasText: /chon lai noi mua|chọn lại nơi mua|dinh vi theo dia chi giao|định vị theo địa chỉ giao/i })
+        .first()
+        .or(root);
+    const cheapestStore = storeSection
+        .locator('button, li, article, [role="option"], [data-testid*="store"], .store-card')
+        .filter({ hasText: /re nhat|rẻ nhất/i })
+        .first();
+
+    await expect(cheapestStore).toBeVisible({ timeout: 30_000 });
+    await cheapestStore.scrollIntoViewIfNeeded();
+    await cheapestStore.click({ force: true });
+
+    await attachReportState(page, testInfo, 'delivery-cheapest-store-selected', {
+        locator: cheapestStore,
+        prefix: reportPrefix,
+    });
+}
+
+async function expectBhxAgenticPopup(page: Page): Promise<void> {
+    await expect(page.locator('body')).toContainText(
+        /phuc vu boi affree agentic|phục vụ bởi affree agentic|phuc vu boi agentic ai|phục vụ bởi agentic ai/i,
+        { timeout: 30_000 }
+    );
+}
+
+async function captureBhxAgentStateAfterClick(
+    page: Page,
+    testInfo: TestInfo
+): Promise<void> {
+    await attachOrderCaseState(page, testInfo, 'bhx', 'after-final-cta-click');
+    await expectBhxAgenticPopup(page);
+    await attachOrderCaseState(page, testInfo, 'bhx', 'agentic-ai-visible');
+    await page.waitForTimeout(bhxAgentWaitMs);
+    await attachOrderCaseState(page, testInfo, 'bhx', 'agentic-ai-after-wait');
 }
 
 function resolveOrderReportName(name: string): {
@@ -392,6 +539,7 @@ async function clickFirstCoopmartStoreBuyButton(
     await expect(coopmartStoreCard).toBeVisible({ timeout: 30_000 });
 
     await attachImportantScreenshot(testInfo, 'first-coopmart-store-card', {
+        page,
         locator: coopmartStoreCard,
         prefix: getOrderReportPrefix('coop'),
     });
@@ -1004,6 +1152,33 @@ test.describe('@flow-order Order recipient form config', () => {
             .toBe('true');
     });
 
+    test('should click the enabled final CTA when duplicate CTAs are rendered', async ({
+        page,
+    }) => {
+        const bhxCase = getOrderStoreCase('bhx');
+        const orderForm = new OrderFormComponent(page);
+
+        await page.setContent(`
+            <div role="dialog">
+                <button type="button" disabled onclick="document.body.dataset.clickedDisabled = 'true'">
+                    Để trợ lý đặt giúp →
+                </button>
+                <button type="button" onclick="document.body.dataset.clickedEnabled = 'true'">
+                    Để trợ lý đặt giúp →
+                </button>
+            </div>
+        `);
+
+        await orderForm.finalCta(bhxCase).click({ timeout: 1_000 });
+
+        await expect
+            .poll(() => page.locator('body').evaluate(body => body.dataset.clickedEnabled || ''))
+            .toBe('true');
+        await expect
+            .poll(() => page.locator('body').evaluate(body => body.dataset.clickedDisabled || ''))
+            .toBe('');
+    });
+
     test('should select the last native Coop delivery date option', async ({
         page,
     }) => {
@@ -1077,6 +1252,185 @@ test.describe('@flow-order Order recipient form config', () => {
         expect(OrderRecipientFixture.mlbl.receiverName).toBe('Thach');
     });
 
+    test('should keep BHX recipient defaults editable and isolated', () => {
+        expect(OrderRecipientFixture.bhx.receiverName).toBe('Trạch');
+        expect(OrderRecipientFixture.bhx.phone).toBe('0305070809');
+        expect(OrderRecipientFixture.bhx.deliveryAddress).toBe(
+            'Thị trấn Tân Túc, Phường 6, Quận Gò Vấp, Thành phố Hồ Chí Minh'
+        );
+        expect(OrderRecipientFixture.bhx.deliverySlot).toBe('Trong hôm nay');
+
+        expect(OrderRecipientFixture.concung.receiverName).toBe('Thach');
+        expect(OrderRecipientFixture.mlbl.receiverName).toBe('Thach');
+    });
+
+    test('should select BHX cheapest buy and delivery options', async ({
+        page,
+    }, testInfo) => {
+        const recipient = OrderRecipientFixture.bhx;
+
+        await page.setContent(`
+            <main>
+                <ul>
+                    <li>
+                        <span>Bách Hóa Xanh</span>
+                        <span>Gần nhất</span>
+                        <button type="button" onclick="document.body.dataset.clickedNearest = 'true'">
+                            Mua ngay
+                        </button>
+                    </li>
+                    <li>
+                        <span>Bách Hóa Xanh</span>
+                        <span class="rounded-full bg-emerald-600">rẻ nhất</span>
+                        <button type="button" onclick="document.body.dataset.clickedCheapest = 'true'">
+                            Mua ngay
+                        </button>
+                    </li>
+                </ul>
+                <div role="dialog">
+                    <button type="button" onclick="document.body.dataset.slot = 'Ngày mai'">
+                        Ngày mai
+                    </button>
+                    <button type="button" onclick="document.body.dataset.slot = 'Trong hôm nay'">
+                        Trong hôm nay
+                    </button>
+                    <section aria-label="Chọn lại nơi mua">
+                        <p>Định vị theo địa chỉ giao</p>
+                        <button type="button" onclick="document.body.dataset.selectedStore = 'nearest'">
+                            Bách Hóa Xanh Tân Túc <span>gần nhất</span>
+                        </button>
+                        <button type="button" onclick="document.body.dataset.selectedStore = 'cheapest'">
+                            Bách Hóa Xanh Gò Vấp <span>rẻ nhất</span>
+                        </button>
+                    </section>
+                </div>
+            </main>
+        `);
+
+        await clickBhxCheapestStoreBuyButton(page, testInfo);
+        await selectBhxDeliverySlot(page, recipient);
+        await selectBhxCheapestDeliveryStore(page, testInfo);
+
+        await expect
+            .poll(() => page.locator('body').evaluate(body => body.dataset.clickedNearest || ''))
+            .toBe('');
+        await expect
+            .poll(() => page.locator('body').evaluate(body => body.dataset.clickedCheapest || ''))
+            .toBe('true');
+        await expect
+            .poll(() => page.locator('body').evaluate(body => body.dataset.slot || ''))
+            .toBe('Trong hôm nay');
+        await expect
+            .poll(() => page.locator('body').evaluate(body => body.dataset.selectedStore || ''))
+            .toBe('cheapest');
+    });
+
+    test('should select BHX delivery slot from native select options', async ({
+        page,
+    }) => {
+        const recipient = OrderRecipientFixture.bhx;
+
+        await page.setContent(`
+            <div role="dialog">
+                <select aria-label="Khung giờ giao">
+                    <option>Ngày mai</option>
+                    <option value="Trong hôm nay (2–4 giờ)">Trong hôm nay (2–4 giờ)</option>
+                </select>
+            </div>
+        `);
+
+        await selectBhxDeliverySlot(page, recipient);
+
+        await expect(page.getByLabel(/khung giờ giao/i)).toHaveValue(
+            'Trong hôm nay (2–4 giờ)'
+        );
+    });
+
+    test('should fill BHX phone and address fields below requirement text', async ({
+        page,
+    }) => {
+        const recipient = OrderRecipientFixture.bhx;
+        const orderForm = new OrderFormComponent(page);
+        const storeCase = getOrderStoreCase('bhx');
+
+        await page.setContent(`
+            <div role="dialog">
+                <section>
+                    <p>Bach Hoa Xanh yeu cau de dat mon nay:</p>
+                    <ul>
+                        <li>So dien thoai</li>
+                        <li>Dia chi giao</li>
+                        <li>Khung gio giao</li>
+                    </ul>
+                </section>
+                <div>
+                    <div>Nguoi nhan</div>
+                    <input data-testid="receiver" placeholder="Ho va ten" />
+                </div>
+                <div>
+                    <div>So dien thoai</div>
+                    <input data-testid="phone" placeholder="VD: 0901234567" />
+                </div>
+                <div>
+                    <div>Dia chi giao</div>
+                    <textarea data-testid="address" placeholder="So nha, duong, phuong, quan..."></textarea>
+                </div>
+            </div>
+        `);
+
+        await orderForm.fillStoreForm(storeCase, recipient);
+
+        await expect(page.getByTestId('receiver')).toHaveValue(recipient.receiverName);
+        await expect(page.getByTestId('phone')).toHaveValue(recipient.phone);
+        await expect(page.getByTestId('address')).toHaveValue(
+            recipient.deliveryAddress || ''
+        );
+    });
+
+    test('should not click cheapest badges when selecting the cheapest tab', async ({
+        page,
+    }) => {
+        const orderFlow = new OrderFlowComponent(page);
+
+        await page.setContent(`
+            <main>
+                <span onclick="document.body.dataset.clickedBadge = 'true'">
+                    Rẻ nhất
+                </span>
+            </main>
+        `);
+
+        await orderFlow.selectCheapestTab();
+
+        await expect
+            .poll(() => page.locator('body').evaluate(body => body.dataset.clickedBadge || ''))
+            .toBe('');
+    });
+
+    test('should not click cheapest map markers when selecting the cheapest tab', async ({
+        page,
+    }) => {
+        const orderFlow = new OrderFlowComponent(page);
+
+        await page.setContent(`
+            <main>
+                <div
+                    role="button"
+                    tabindex="0"
+                    onclick="document.body.dataset.clickedMarker = 'true'"
+                >
+                    Rẻ nhất
+                </div>
+            </main>
+        `);
+
+        await orderFlow.selectCheapestTab();
+
+        await expect
+            .poll(() => page.locator('body').evaluate(body => body.dataset.clickedMarker || ''))
+            .toBe('');
+    });
+
     test('should keep order report prefixes distinct by store chain', () => {
         expect(getOrderReportPrefix('coop')).toBe('co.op-');
         expect(getOrderReportPrefix('bhx')).toBe('bhx-');
@@ -1144,9 +1498,58 @@ test.describe('@flow-order @coop Co.op order flow', () => {
     });
 });
 
+test.describe('@flow-order @bhx Bách Hóa Xanh order flow', () => {
+    test.describe.configure({ timeout: 180_000 });
+
+    test('@bhx should fill recipient form and capture agentic order state', async ({
+        page,
+    }, testInfo) => {
+        const runtimeOptions = getOrderFlowRuntimeOptions();
+        const storeCase = getOrderStoreCase('bhx');
+        const recipient = OrderRecipientFixture.bhx;
+        const orderFlow = new OrderFlowComponent(page);
+        const orderForm = new OrderFormComponent(page);
+
+        await orderFlow.openHome();
+        await orderFlow.searchAndSelectProduct(bhxProductName);
+        await orderFlow.selectLocationIfAvailable(recipient.deliveryAddress);
+        await orderFlow.selectCheapestTab();
+        await clickBhxCheapestStoreBuyButton(page, testInfo);
+        await orderFlow.openCartIfOrderFormMissing();
+        await orderForm.expectStoreFormReady(storeCase, testInfo);
+
+        await orderForm.fillStoreForm(storeCase, recipient);
+        await selectBhxDeliverySlot(page, recipient);
+        await selectBhxCheapestDeliveryStore(page, testInfo);
+        await attachOrderCaseState(page, testInfo, storeCase.chain, 'form-filled');
+
+        await expectBhxAgenticPopup(page);
+        await attachOrderCaseState(page, testInfo, storeCase.chain, 'agentic-popup-filled');
+
+        const finalCta = orderForm.finalCta(storeCase);
+        await expect(finalCta).toBeVisible({ timeout: 30_000 });
+
+        if (!runtimeOptions.clickFinalCta) {
+            await attachOrderCaseState(
+                page,
+                testInfo,
+                storeCase.chain,
+                'final-cta-ready'
+            );
+            return;
+        }
+
+        await finalCta.click();
+        await captureBhxAgentStateAfterClick(page, testInfo);
+    });
+});
+
 test.describe('@flow-order Prepare order by store', () => {
     for (const storeCase of orderStoreCases.filter(
-        candidate => candidate.chain !== 'coop' && candidate.chain !== 'mlbl'
+        candidate =>
+            candidate.chain !== 'coop' &&
+            candidate.chain !== 'bhx' &&
+            candidate.chain !== 'mlbl'
     )) {
         test(`${storeCase.tag} should fill recipient form and capture agentic order state`, async ({
             page,

@@ -10,6 +10,7 @@ export type OrderRecipientData = {
     houseNumber?: string;
     streetName?: string;
     deliveryAddress?: string;
+    deliverySlot?: string;
 };
 
 export const OrderReportPrefixFixture: Record<OrderStoreChain, string> = {
@@ -47,8 +48,12 @@ export const OrderRecipientFixture: Record<OrderStoreChain, OrderRecipientData> 
             '246 Nguyễn Trọng Tuyển, Phường 1, Quận Phú Nhuận, TP.HCM',
     },
     bhx: {
-        ...commonRecipient,
-        deliveryAddress: defaultDeliveryAddress,
+        receiverName: process.env.ORDER_BHX_RECEIVER_NAME || 'Trạch',
+        phone: process.env.ORDER_BHX_RECEIVER_PHONE || '0305070809',
+        deliveryAddress:
+            process.env.ORDER_BHX_DELIVERY_ADDRESS ||
+            'Thị trấn Tân Túc, Phường 6, Quận Gò Vấp, Thành phố Hồ Chí Minh',
+        deliverySlot: process.env.ORDER_BHX_DELIVERY_SLOT || 'Trong hôm nay',
     },
     concung: {
         ...commonRecipient,
