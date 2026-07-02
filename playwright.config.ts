@@ -40,6 +40,16 @@ export default defineConfig({
       testMatch: /.*search-nearby-stores\.spec\.ts/,
       timeout: 120_000,
     }, {
+      name: 'claw-costco',
+      testMatch: /.*claw-costco\/.*\.spec\.ts/,
+      timeout: 120_000,
+      outputDir: 'test-results/claw-costco',
+    }, {
+      name: 'claw-data-costco',
+      testMatch: /.*claw-data-costco\/.*\.spec\.ts/,
+      timeout: 120_000,
+      outputDir: 'test-results/claw-data-costco',
+    }, {
       name: 'flow-order',
       testMatch: /.*flow-order\.spec\.ts/,
       timeout: 180_000,

@@ -136,16 +136,12 @@ export class OrderFlowComponent {
     }
 
     private async closeLocationDropdown(
-        chooseLocationButton: Locator,
+        _chooseLocationButton: Locator,
         suggestion: Locator,
         addressInput: Locator
     ): Promise<void> {
         await this.page.keyboard.press('Escape').catch(() => undefined);
         await this.page.mouse.click(20, 90).catch(() => undefined);
-
-        if (await suggestion.isVisible({ timeout: 1_000 }).catch(() => false)) {
-            await chooseLocationButton.click().catch(() => undefined);
-        }
 
         await expect(suggestion).toBeHidden({ timeout: 5_000 }).catch(() => undefined);
 
@@ -157,16 +153,29 @@ export class OrderFlowComponent {
             .first();
 
         if (await blockingOverlay.isVisible({ timeout: 1_000 }).catch(() => false)) {
+            await this.dismissLocationOverlay(blockingOverlay);
+        }
+    }
+
+    private async dismissLocationOverlay(blockingOverlay: Locator): Promise<void> {
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            if (!(await blockingOverlay.isVisible({ timeout: 1_000 }).catch(() => false))) {
+                return;
+            }
+
             await this.page.keyboard.press('Escape').catch(() => undefined);
 
             const closeButton = blockingOverlay
                 .getByRole('button', { name: /dong|đóng|close|huy|hủy|x/i })
                 .or(blockingOverlay.locator('button[aria-label], button[title]').first())
-                .or(blockingOverlay.locator('button').first())
                 .first();
 
             if (await closeButton.isVisible({ timeout: 1_000 }).catch(() => false)) {
                 await closeButton.click({ force: true }).catch(() => undefined);
+            }
+
+            if (!(await blockingOverlay.isVisible({ timeout: 1_000 }).catch(() => false))) {
+                return;
             }
 
             if (await blockingOverlay.isVisible({ timeout: 1_000 }).catch(() => false)) {
@@ -182,20 +191,19 @@ export class OrderFlowComponent {
                         .catch(() => undefined);
                 }
             }
-
-            if (await blockingOverlay.isVisible({ timeout: 1_000 }).catch(() => false)) {
-                await chooseLocationButton.click({ force: true }).catch(() => undefined);
-            }
-
-            await expect(blockingOverlay).toBeHidden({ timeout: 5_000 }).catch(() => undefined);
         }
+
+        await expect(blockingOverlay).toBeHidden({ timeout: 5_000 });
     }
 
     async selectCheapestTab(): Promise<void> {
         const cheapestTab = this.page
             .getByRole('tab', { name: /re nhat|rẻ nhất/i })
-            .or(this.page.getByRole('button', { name: /re nhat|rẻ nhất/i }))
-            .or(this.page.getByText(/re nhat|rẻ nhất/i))
+            .or(
+                this.page
+                    .locator('button')
+                    .filter({ hasText: /gia re|giá rẻ|re nhat|rẻ nhất/i })
+            )
             .first();
 
         if (await cheapestTab.isVisible({ timeout: 15_000 }).catch(() => false)) {

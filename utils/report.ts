@@ -24,10 +24,22 @@ export async function attachImportantScreenshot(
         throw new Error('attachImportantScreenshot requires a page or locator');
     }
 
+    let body: Buffer;
+
+    if (options.locator) {
+        body = await options.locator.screenshot().catch(async error => {
+            if (!options.page) {
+                throw error;
+            }
+
+            return options.page.screenshot();
+        });
+    } else {
+        body = await options.page!.screenshot();
+    }
+
     await testInfo.attach(buildReportAttachmentName(options.prefix, name), {
-        body: options.locator
-            ? await options.locator.screenshot()
-            : await options.page!.screenshot(),
+        body,
         contentType: 'image/png',
     });
 }
