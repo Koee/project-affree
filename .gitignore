@@ -6,6 +6,7 @@ dist/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+/artifacts/
 
 # Environment files with secrets
 .env
