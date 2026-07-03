@@ -141,4 +141,32 @@ export class GoogleSheetService {
             throw error;
         }
     }
+
+    /**
+     * updateRow(sheetName, rowIndex, row)
+     * Cập nhật một dòng cụ thể (1-based index) trên Google Sheet.
+     */
+    async updateRow(sheetName: string, rowIndex: number, row: SheetRow): Promise<void> {
+        if (!this.sheetsClient) {
+            throw new Error('Google Sheets client is not connected. Call connect() first.');
+        }
+
+        try {
+            // Cập nhật dòng tại index chỉ định (ví dụ range: Products!A2)
+            const range = `${sheetName}!A${rowIndex}`;
+            await this.sheetsClient.spreadsheets.values.update({
+                spreadsheetId: this.sheetId,
+                range,
+                valueInputOption: 'RAW',
+                requestBody: {
+                    values: [row],
+                },
+            });
+
+            logger.info({ sheetName, rowIndex, row }, 'Row updated in Google Sheet');
+        } catch (error) {
+            logger.error({ err: error, sheetName, rowIndex }, 'Failed to update row in Google Sheet');
+            throw error;
+        }
+    }
 }
