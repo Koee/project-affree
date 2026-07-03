@@ -1,6 +1,9 @@
 import type { PrismaClient } from '@prisma/client';
 import type { Product } from '../types/product';
+import type { RawPayloadDTO } from '../types/dto';
+import type { RawPayloadRepository } from './repository-interfaces';
 import { prisma } from './prisma-client';
+
 
 export type CrawlRunStatus = 'running' | 'success' | 'failed';
 
@@ -315,3 +318,39 @@ function toPriceHistoryView(history: {
         capturedAt: history.capturedAt.toISOString(),
     };
 }
+
+export class PrismaRawPayloadRepository implements RawPayloadRepository {
+    constructor(private readonly client: PrismaClient = prisma) {}
+
+    async save(rawPayload: RawPayloadDTO): Promise<void> {
+        await this.client.rawPayload.create({
+            data: {
+                store: rawPayload.store,
+                sku: rawPayload.sku,
+                payload: rawPayload.payload,
+                crawlRunId: rawPayload.crawlRunId || null,
+            },
+        });
+    }
+
+    async findBySku(store: string, sku: string): Promise<RawPayloadDTO | null> {
+        const record = await this.client.rawPayload.findFirst({
+            where: { store, sku },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        if (!record) {
+            return null;
+        }
+
+        return {
+            id: record.id,
+            store: record.store,
+            sku: record.sku,
+            payload: record.payload,
+            crawlRunId: record.crawlRunId || undefined,
+            createdAt: record.createdAt,
+        };
+    }
+}
+

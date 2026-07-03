@@ -3,6 +3,7 @@ import { OpenClawAgent } from '../agent/open-claw-agent';
 import type { ClawCostcoConfig } from '../config/env';
 import { logger } from '../logger';
 import { runWithRetry } from './retry';
+import { SchedulerFactory } from './scheduler-factory';
 
 export type CostcoScheduledTask = {
     start(): void;
@@ -33,8 +34,6 @@ export async function scheduleCostcoCrawl(
     config: ClawCostcoConfig,
     stores: string[] = ['costco']
 ): Promise<CostcoScheduledTask> {
-    const cron = await import('node-cron');
-
     if (!config.schedulerEnabled) {
         return {
             start: () => {
@@ -44,48 +43,23 @@ export async function scheduleCostcoCrawl(
         };
     }
 
-    return cron.createTask(
-        intervalToCronExpression(config.crawlInterval),
-        async () => {
-            for (const store of stores) {
-                logger.info({ store }, 'Starting scheduled crawl');
-                await runWithRetry(
-                    async () => {
-                        if (agent instanceof OpenClawAgent) {
-                            await agent.runCrawl({
-                                store,
-                                source: 'scheduler',
-                                categoryUrl: config.categoryUrl,
-                                category: config.category,
-                                productName: config.productName,
-                                productUrl: config.productUrl,
-                            });
-                        } else {
-                            await agent.runCostcoCrawl({
-                                source: 'scheduler',
-                                categoryUrl: config.categoryUrl,
-                                category: config.category,
-                                productName: config.productName,
-                                productUrl: config.productUrl,
-                            });
-                        }
-                    },
-                    {
-                        retries: config.crawlRetry,
-                        delayMs: config.crawlRetryDelayMs,
-                        onRetry: ({ attempt, error }) => {
-                            logger.warn(
-                                {
-                                    store,
-                                    attempt,
-                                    error: error.message,
-                                },
-                                'Retrying scheduled crawl'
-                            );
-                        },
-                    }
-                );
-            }
-        }
+    const tasks = await Promise.all(
+        stores.map(async (store) => {
+            const storeScheduler = SchedulerFactory.create(store, agent, config);
+            return storeScheduler.createTask();
+        })
     );
+
+    return {
+        start: () => {
+            for (const task of tasks) {
+                task.start();
+            }
+        },
+        stop: () => {
+            for (const task of tasks) {
+                task.stop();
+            }
+        },
+    };
 }

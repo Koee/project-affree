@@ -53,3 +53,15 @@ model CrawlRun {
 
   @@index([store])
 }
+
+model RawPayload {
+  id         String   @id @default(cuid())
+  store      String
+  sku        String
+  payload    Json
+  crawlRunId String?
+  createdAt  DateTime @default(now())
+
+  @@index([store, sku])
+}
+
