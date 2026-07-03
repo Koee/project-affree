@@ -6,6 +6,8 @@ import type {
 } from './open-claw-types';
 import type { CrawlAgent, CrawlJobInput } from './types';
 
+import { WalmartCrawlerAgent } from './walmart-crawler-agent';
+
 export class OpenClawAgent {
     private readonly crawlers = new Map<StoreName, CrawlerRegistration>();
 
@@ -33,5 +35,13 @@ export function wrapCostcoAgent(agent: CrawlAgent): CrawlerRegistration {
         store: 'costco',
         crawl: (input) =>
             agent.runCostcoCrawl(input as CrawlJobInput) as Promise<OpenClawCrawlResult>,
+    };
+}
+
+export function wrapWalmartAgent(agent: WalmartCrawlerAgent): CrawlerRegistration {
+    return {
+        store: 'walmart',
+        crawl: (input) =>
+            agent.runWalmartCrawl(input as CrawlJobInput) as Promise<OpenClawCrawlResult>,
     };
 }
