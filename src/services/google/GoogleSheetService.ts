@@ -40,6 +40,7 @@ export class GoogleSheetService {
     private sheetsClient: sheets_v4.Sheets | null = null;
     private readonly sheetId: string;
     private readonly credentials: { client_email: string; private_key: string };
+    private connectPromise: Promise<void> | null = null;
 
     constructor() {
         // Đọc cấu hình từ env
@@ -56,6 +57,17 @@ export class GoogleSheetService {
 
         this.sheetId = sheetId;
         this.credentials = resolveServiceAccountEnv(serviceAccountRaw);
+    }
+
+    /**
+     * Tự động thiết lập kết nối lười (Lazy Connection) nếu chưa được kết nối.
+     */
+    async ensureConnected(): Promise<void> {
+        if (this.sheetsClient) return;
+        if (!this.connectPromise) {
+            this.connectPromise = this.connect();
+        }
+        return this.connectPromise;
     }
 
     /**
@@ -86,6 +98,7 @@ export class GoogleSheetService {
             logger.info({ sheetId: this.sheetId }, 'Google Sheets connection established');
         } catch (error) {
             logger.error({ err: error }, 'Failed to connect to Google Sheets');
+            this.connectPromise = null; // Reset promise để thử lại nếu lỗi
             throw error;
         }
     }
@@ -95,12 +108,10 @@ export class GoogleSheetService {
      * Chỉ append 1 dòng vào cuối sheet. Không sửa logic business.
      */
     async appendRow(sheetName: string, row: SheetRow): Promise<void> {
-        if (!this.sheetsClient) {
-            throw new Error('Google Sheets client is not connected. Call connect() first.');
-        }
+        await this.ensureConnected();
 
         try {
-            await this.sheetsClient.spreadsheets.values.append({
+            await this.sheetsClient!.spreadsheets.values.append({
                 spreadsheetId: this.sheetId,
                 range: `${sheetName}!A:A`,
                 valueInputOption: 'RAW',
@@ -122,12 +133,10 @@ export class GoogleSheetService {
      * Đọc toàn bộ dòng trong sheet. Trả về mảng các dòng.
      */
     async readRows(sheetName: string): Promise<SheetRow[]> {
-        if (!this.sheetsClient) {
-            throw new Error('Google Sheets client is not connected. Call connect() first.');
-        }
+        await this.ensureConnected();
 
         try {
-            const response = await this.sheetsClient.spreadsheets.values.get({
+            const response = await this.sheetsClient!.spreadsheets.values.get({
                 spreadsheetId: this.sheetId,
                 range: `${sheetName}!A:Z`,
             });
@@ -147,14 +156,12 @@ export class GoogleSheetService {
      * Cập nhật một dòng cụ thể (1-based index) trên Google Sheet.
      */
     async updateRow(sheetName: string, rowIndex: number, row: SheetRow): Promise<void> {
-        if (!this.sheetsClient) {
-            throw new Error('Google Sheets client is not connected. Call connect() first.');
-        }
+        await this.ensureConnected();
 
         try {
             // Cập nhật dòng tại index chỉ định (ví dụ range: Products!A2)
             const range = `${sheetName}!A${rowIndex}`;
-            await this.sheetsClient.spreadsheets.values.update({
+            await this.sheetsClient!.spreadsheets.values.update({
                 spreadsheetId: this.sheetId,
                 range,
                 valueInputOption: 'RAW',

@@ -3,6 +3,9 @@ import type { Product } from '../types/product';
 import type { RawPayloadDTO } from '../types/dto';
 import type { RawPayloadRepository } from './repository-interfaces';
 import { prisma } from './prisma-client';
+import { IStorageService } from '../../src/storage/IStorageService';
+import { GoogleSheetStorage } from '../../src/storage/GoogleSheetStorage';
+import { GoogleSheetService } from '../../src/services/google/GoogleSheetService';
 
 
 export type CrawlRunStatus = 'running' | 'success' | 'failed';
@@ -80,19 +83,28 @@ export interface ReadRepository {
     listLatestPriceSignals(store: string, limit?: number): Promise<PriceSignalSource[]>;
 }
 
+function isStorageService(storage: any): storage is IStorageService {
+    return storage && typeof storage.saveProduct === 'function';
+}
+
 export class PrismaProductRepository implements ProductRepository {
-    constructor(private readonly client: PrismaClient = prisma) {}
+    private readonly client?: PrismaClient;
+    private readonly storage?: IStorageService;
+
+    constructor(storageOrClient?: IStorageService | PrismaClient) {
+        if (!storageOrClient) {
+            this.storage = new GoogleSheetStorage(new GoogleSheetService());
+        } else if (isStorageService(storageOrClient)) {
+            this.storage = storageOrClient;
+        } else {
+            this.client = storageOrClient as PrismaClient;
+        }
+    }
 
     async upsertMany(products: Product[], context: ProductUpsertContext): Promise<void> {
-        for (const product of products) {
-            await this.client.product.upsert({
-                where: {
-                    store_sku: {
-                        store: context.store,
-                        sku: product.sku,
-                    },
-                },
-                create: {
+        if (this.storage) {
+            for (const product of products) {
+                await this.storage.saveProduct({
                     store: context.store,
                     sku: product.sku,
                     name: product.name,
@@ -100,18 +112,9 @@ export class PrismaProductRepository implements ProductRepository {
                     category: product.category,
                     image: product.image,
                     url: product.url,
-                },
-                update: {
-                    name: product.name,
-                    price: product.price,
-                    category: product.category,
-                    image: product.image,
-                    url: product.url,
-                },
-            });
+                });
 
-            await this.client.priceHistory.create({
-                data: {
+                await this.storage.savePriceHistory({
                     store: context.store,
                     sku: product.sku,
                     price: product.price,
@@ -119,28 +122,100 @@ export class PrismaProductRepository implements ProductRepository {
                     source: context.source,
                     crawlRunId: context.crawlRunId,
                     capturedAt: context.capturedAt,
-                },
-            });
+                });
+            }
+        } else if (this.client) {
+            for (const product of products) {
+                await this.client.product.upsert({
+                    where: {
+                        store_sku: {
+                            store: context.store,
+                            sku: product.sku,
+                        },
+                    },
+                    create: {
+                        store: context.store,
+                        sku: product.sku,
+                        name: product.name,
+                        price: product.price,
+                        category: product.category,
+                        image: product.image,
+                        url: product.url,
+                    },
+                    update: {
+                        name: product.name,
+                        price: product.price,
+                        category: product.category,
+                        image: product.image,
+                        url: product.url,
+                    },
+                });
+
+                await this.client.priceHistory.create({
+                    data: {
+                        store: context.store,
+                        sku: product.sku,
+                        price: product.price,
+                        currency: 'USD',
+                        source: context.source,
+                        crawlRunId: context.crawlRunId,
+                        capturedAt: context.capturedAt,
+                    },
+                });
+            }
         }
     }
 }
 
 export class PrismaCrawlRunRepository implements CrawlRunRepository {
-    constructor(private readonly client: PrismaClient = prisma) {}
+    private readonly client?: PrismaClient;
+    private readonly storage?: IStorageService;
+    private activeRuns = new Map<string, { store: string; source: string; startedAt: Date }>();
+
+    constructor(storageOrClient?: IStorageService | PrismaClient) {
+        if (!storageOrClient) {
+            this.storage = new GoogleSheetStorage(new GoogleSheetService());
+        } else if (isStorageService(storageOrClient)) {
+            this.storage = storageOrClient;
+        } else {
+            this.client = storageOrClient as PrismaClient;
+        }
+    }
 
     async startRun(input: { store: string; source: string; startedAt: Date }): Promise<StartedCrawlRun> {
-        return this.client.crawlRun.create({
-            data: {
+        if (this.storage) {
+            const id = `run-${Date.now()}`;
+            this.activeRuns.set(id, {
+                store: input.store,
+                source: input.source,
+                startedAt: input.startedAt,
+            });
+
+            await this.storage.saveCrawlRun({
+                id,
                 store: input.store,
                 source: input.source,
                 status: 'running',
                 productCount: 0,
+                errorMessage: null,
                 startedAt: input.startedAt,
-            },
-            select: {
-                id: true,
-            },
-        });
+            });
+
+            return { id };
+        } else {
+            return this.client!.crawlRun.create({
+                data: {
+                    store: input.store,
+                    source: input.source,
+                    status: 'running',
+                    productCount: 0,
+                    startedAt: input.startedAt,
+                },
+                select: {
+                    id: true,
+                },
+            });
+        }
     }
 
     async completeRun(input: {
@@ -150,17 +225,37 @@ export class PrismaCrawlRunRepository implements CrawlRunRepository {
         errorMessage?: string;
         finishedAt: Date;
     }): Promise<void> {
-        await this.client.crawlRun.update({
-            where: {
+        if (this.storage) {
+            const meta = this.activeRuns.get(input.id);
+            const startedAt = meta ? meta.startedAt : new Date();
+            const store = meta ? meta.store : 'costco';
+            const source = meta ? meta.source : 'manual';
+
+            await this.storage.saveCrawlRun({
                 id: input.id,
-            },
-            data: {
+                store,
+                source,
                 status: input.status,
                 productCount: input.productCount,
-                errorMessage: input.errorMessage,
+                errorMessage: input.errorMessage || null,
+                startedAt,
                 finishedAt: input.finishedAt,
-            },
-        });
+            });
+
+            this.activeRuns.delete(input.id);
+        } else {
+            await this.client!.crawlRun.update({
+                where: {
+                    id: input.id,
+                },
+                data: {
+                    status: input.status,
+                    productCount: input.productCount,
+                    errorMessage: input.errorMessage,
+                    finishedAt: input.finishedAt,
+                },
+            });
+        }
     }
 }
 
