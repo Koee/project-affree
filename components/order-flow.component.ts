@@ -230,7 +230,7 @@ export class OrderFlowComponent {
             .getByText(/nguoi nhan|người nhận|so dien thoai|số điện thoại|de tro ly dat giup|để trợ lý đặt giúp/i)
             .first();
 
-        if (await orderFormMarker.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        if (await orderFormMarker.isVisible({ timeout: 5_000 }).catch(() => false)) {
             return;
         }
 
@@ -238,8 +238,31 @@ export class OrderFlowComponent {
             .getByRole('button', { name: /gio hang|giỏ hàng/i })
             .first();
 
-        if (await cartButton.isVisible({ timeout: 5_000 }).catch(() => false)) {
+        for (let attempt = 1; attempt <= 3; attempt += 1) {
+            if (await orderFormMarker.isVisible({ timeout: 2_000 }).catch(() => false)) {
+                return;
+            }
+
+            if (!(await cartButton.isVisible({ timeout: 5_000 }).catch(() => false))) {
+                return;
+            }
+
             await cartButton.click();
+
+            const dialogOpened = await this.page
+                .locator('[role="dialog"]')
+                .last()
+                .isVisible({ timeout: 5_000 })
+                .catch(() => false);
+
+            if (
+                dialogOpened ||
+                (await orderFormMarker.isVisible({ timeout: 3_000 }).catch(() => false))
+            ) {
+                return;
+            }
+
+            await this.page.waitForTimeout(1_000);
         }
     }
 

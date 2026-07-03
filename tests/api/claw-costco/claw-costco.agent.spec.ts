@@ -7,9 +7,9 @@ import type {
     CrawlJobResult,
 } from '../../../claw-costco/agent/types';
 import type {
-    CostcoCrawlRunRepository,
-    CostcoReadRepository,
-    CostcoProductRepository,
+    CrawlRunRepository,
+    ReadRepository,
+    ProductRepository,
 } from '../../../claw-costco/db/repositories';
 import type { Product } from '../../../claw-costco/types/product';
 
@@ -65,6 +65,7 @@ test.describe('@claw-costco agent boundary', () => {
 
         expect(runRepository.startedRuns).toEqual([
             {
+                store: 'costco',
                 source: 'manual',
                 startedAt: result.startedAt,
             },
@@ -72,6 +73,7 @@ test.describe('@claw-costco agent boundary', () => {
         expect(productRepository.upsertedProducts).toEqual([expectedProduct]);
         expect(productRepository.upsertContexts).toEqual([
             {
+                store: 'costco',
                 source: 'manual',
                 crawlRunId: 'crawl-run-1',
                 capturedAt: result.finishedAt,
@@ -227,10 +229,10 @@ test.describe('@claw-costco agent boundary', () => {
         });
 
         expect(readRepository.calls).toEqual([
-            ['listRuns', 1],
-            ['listProducts', 1],
-            ['listPriceHistory', '4000424213', 1],
-            ['getStatus'],
+            ['listRuns', 'costco', 1],
+            ['listProducts', 'costco', 1],
+            ['listPriceHistory', 'costco', '4000424213', 1],
+            ['getStatus', 'costco'],
         ]);
 
         await server.close();
@@ -287,18 +289,19 @@ class RecordingCrawlAgent implements CrawlAgent {
     }
 }
 
-class FakeProductRepository implements CostcoProductRepository {
+class FakeProductRepository implements ProductRepository {
     readonly upsertedProducts: Product[] = [];
     readonly upsertContexts: unknown[] = [];
 
-    async upsertMany(products: Product[], context?: unknown): Promise<void> {
+    async upsertMany(products: Product[], context: any): Promise<void> {
         this.upsertedProducts.push(...products);
         this.upsertContexts.push(context);
     }
 }
 
-class FakeCrawlRunRepository implements CostcoCrawlRunRepository {
+class FakeCrawlRunRepository implements CrawlRunRepository {
     readonly startedRuns: Array<{
+        store: string;
         source: string;
         startedAt: Date;
     }> = [];
@@ -310,7 +313,7 @@ class FakeCrawlRunRepository implements CostcoCrawlRunRepository {
         finishedAt: Date;
     }> = [];
 
-    async startRun(input: { source: string; startedAt: Date }): Promise<{ id: string }> {
+    async startRun(input: { store: string; source: string; startedAt: Date }): Promise<{ id: string }> {
         this.startedRuns.push(input);
 
         return { id: 'crawl-run-1' };
@@ -318,7 +321,7 @@ class FakeCrawlRunRepository implements CostcoCrawlRunRepository {
 
     async completeRun(input: {
         id: string;
-        status: string;
+        status: any;
         productCount: number;
         errorMessage?: string;
         finishedAt: Date;
@@ -327,11 +330,12 @@ class FakeCrawlRunRepository implements CostcoCrawlRunRepository {
     }
 }
 
-class FakeReadRepository implements CostcoReadRepository {
+class FakeReadRepository implements ReadRepository {
     readonly calls: unknown[] = [];
     readonly runs = [
         {
             id: 'crawl-run-1',
+            store: 'costco',
             source: 'manual',
             status: 'success',
             productCount: 1,
@@ -370,26 +374,26 @@ class FakeReadRepository implements CostcoReadRepository {
         },
     ];
 
-    async listRuns(limit: number) {
-        this.calls.push(['listRuns', limit]);
+    async listRuns(store: string, limit: number) {
+        this.calls.push(['listRuns', store, limit]);
 
         return this.runs.slice(0, limit);
     }
 
-    async listProducts(limit: number) {
-        this.calls.push(['listProducts', limit]);
+    async listProducts(store: string, limit: number) {
+        this.calls.push(['listProducts', store, limit]);
 
         return this.products.slice(0, limit);
     }
 
-    async listPriceHistory(sku: string, limit: number) {
-        this.calls.push(['listPriceHistory', sku, limit]);
+    async listPriceHistory(store: string, sku: string, limit: number) {
+        this.calls.push(['listPriceHistory', store, sku, limit]);
 
         return this.priceHistory.slice(0, limit);
     }
 
-    async getStatus() {
-        this.calls.push(['getStatus']);
+    async getStatus(store: string) {
+        this.calls.push(['getStatus', store]);
 
         return {
             lastRun: this.runs[0],
@@ -398,7 +402,8 @@ class FakeReadRepository implements CostcoReadRepository {
         };
     }
 
-    async listLatestPriceSignals() {
+    async listLatestPriceSignals(store: string, limit?: number) {
+        this.calls.push(['listLatestPriceSignals', store, limit]);
         return [
             {
                 sku: '4000424213',

@@ -94,9 +94,14 @@ export class OrderFormComponent {
             .getByText(/nguoi nhan|người nhận|so dien thoai|số điện thoại/i)
             .or(this.finalCta(storeCase))
             .first();
-        const isReady = await marker.isVisible({ timeout: 10_000 }).catch(() => false);
 
-        if (isReady) {
+        if (await marker.isVisible({ timeout: 10_000 }).catch(() => false)) {
+            return;
+        }
+
+        await this.tryOpenCartDialog();
+
+        if (await marker.isVisible({ timeout: 10_000 }).catch(() => false)) {
             return;
         }
 
@@ -120,6 +125,27 @@ export class OrderFormComponent {
         throw new Error(
             `Order form did not open for ${storeCase.chain} after clicking Mua/cart`
         );
+    }
+
+    private async tryOpenCartDialog(): Promise<void> {
+        const cartButton = this.page
+            .getByRole('button', { name: /gio hang|giỏ hàng/i })
+            .first();
+
+        if (!(await cartButton.isVisible({ timeout: 3_000 }).catch(() => false))) {
+            return;
+        }
+
+        for (let attempt = 1; attempt <= 3; attempt += 1) {
+            const dialog = this.page.locator('[role="dialog"]').last();
+
+            if (await dialog.isVisible({ timeout: 2_000 }).catch(() => false)) {
+                return;
+            }
+
+            await cartButton.click().catch(() => undefined);
+            await this.page.waitForTimeout(1_000);
+        }
     }
 
     async increaseQuantityUntilMinTotal(

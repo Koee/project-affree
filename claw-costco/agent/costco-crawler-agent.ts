@@ -1,9 +1,9 @@
 import { PlaywrightCostcoProductCrawler } from '../crawler/costco-product-crawler';
 import {
-    PrismaCostcoCrawlRunRepository,
-    PrismaCostcoProductRepository,
-    type CostcoCrawlRunRepository,
-    type CostcoProductRepository,
+    PrismaCrawlRunRepository,
+    PrismaProductRepository,
+    type CrawlRunRepository,
+    type ProductRepository,
 } from '../db/repositories';
 import type {
     CrawlAgent,
@@ -14,20 +14,20 @@ import type {
 
 export type CostcoCrawlerAgentOptions = {
     crawler?: CostcoProductCrawler;
-    productRepository?: CostcoProductRepository;
-    runRepository?: CostcoCrawlRunRepository;
+    productRepository?: ProductRepository;
+    runRepository?: CrawlRunRepository;
 };
 
 export class CostcoCrawlerAgent implements CrawlAgent {
     private readonly crawler: CostcoProductCrawler;
-    private readonly productRepository?: CostcoProductRepository;
-    private readonly runRepository?: CostcoCrawlRunRepository;
+    private readonly productRepository?: ProductRepository;
+    private readonly runRepository?: CrawlRunRepository;
 
     constructor(crawlerOrOptions?: CostcoProductCrawler | CostcoCrawlerAgentOptions) {
         if (!crawlerOrOptions) {
             this.crawler = new PlaywrightCostcoProductCrawler();
-            this.productRepository = new PrismaCostcoProductRepository();
-            this.runRepository = new PrismaCostcoCrawlRunRepository();
+            this.productRepository = new PrismaProductRepository();
+            this.runRepository = new PrismaCrawlRunRepository();
             return;
         }
 
@@ -44,6 +44,7 @@ export class CostcoCrawlerAgent implements CrawlAgent {
     async runCostcoCrawl(input: CrawlJobInput): Promise<CrawlJobResult> {
         const startedAt = new Date();
         const run = await this.runRepository?.startRun({
+            store: 'costco',
             source: input.source,
             startedAt,
         });
@@ -53,6 +54,7 @@ export class CostcoCrawlerAgent implements CrawlAgent {
             const finishedAt = new Date();
 
             await this.productRepository?.upsertMany(products, {
+                store: 'costco',
                 source: input.source,
                 crawlRunId: run?.id,
                 capturedAt: finishedAt,

@@ -1,4 +1,5 @@
 import type { CrawlAgent } from '../agent/types';
+import { OpenClawAgent } from '../agent/open-claw-agent';
 import type { ClawCostcoConfig } from '../config/env';
 import { logger } from '../logger';
 import { runWithRetry } from './retry';
@@ -28,15 +29,16 @@ export function intervalToCronExpression(interval: string): string {
 }
 
 export async function scheduleCostcoCrawl(
-    agent: CrawlAgent,
-    config: ClawCostcoConfig
+    agent: CrawlAgent | OpenClawAgent,
+    config: ClawCostcoConfig,
+    stores: string[] = ['costco']
 ): Promise<CostcoScheduledTask> {
     const cron = await import('node-cron');
 
     if (!config.schedulerEnabled) {
         return {
             start: () => {
-                logger.info({ store: 'costco' }, 'Costco scheduler is disabled');
+                logger.info({ stores }, 'Scheduler is disabled');
             },
             stop: () => undefined,
         };
@@ -45,31 +47,45 @@ export async function scheduleCostcoCrawl(
     return cron.createTask(
         intervalToCronExpression(config.crawlInterval),
         async () => {
-            logger.info({ store: 'costco' }, 'Starting scheduled Costco crawl');
-            await runWithRetry(
-                () =>
-                    agent.runCostcoCrawl({
-                        source: 'scheduler',
-                        categoryUrl: config.categoryUrl,
-                        category: config.category,
-                        productName: config.productName,
-                        productUrl: config.productUrl,
-                    }),
-                {
-                    retries: config.crawlRetry,
-                    delayMs: config.crawlRetryDelayMs,
-                    onRetry: ({ attempt, error }) => {
-                        logger.warn(
-                            {
-                                store: 'costco',
-                                attempt,
-                                error: error.message,
-                            },
-                            'Retrying scheduled Costco crawl'
-                        );
+            for (const store of stores) {
+                logger.info({ store }, 'Starting scheduled crawl');
+                await runWithRetry(
+                    async () => {
+                        if (agent instanceof OpenClawAgent) {
+                            await agent.runCrawl({
+                                store,
+                                source: 'scheduler',
+                                categoryUrl: config.categoryUrl,
+                                category: config.category,
+                                productName: config.productName,
+                                productUrl: config.productUrl,
+                            });
+                        } else {
+                            await agent.runCostcoCrawl({
+                                source: 'scheduler',
+                                categoryUrl: config.categoryUrl,
+                                category: config.category,
+                                productName: config.productName,
+                                productUrl: config.productUrl,
+                            });
+                        }
                     },
-                }
-            );
+                    {
+                        retries: config.crawlRetry,
+                        delayMs: config.crawlRetryDelayMs,
+                        onRetry: ({ attempt, error }) => {
+                            logger.warn(
+                                {
+                                    store,
+                                    attempt,
+                                    error: error.message,
+                                },
+                                'Retrying scheduled crawl'
+                            );
+                        },
+                    }
+                );
+            }
         }
     );
 }

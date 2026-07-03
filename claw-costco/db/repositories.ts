@@ -9,13 +9,15 @@ export type StartedCrawlRun = {
 };
 
 export type ProductUpsertContext = {
+    store: string;
     source: string;
     crawlRunId?: string;
     capturedAt: Date;
 };
 
-export type CostcoRunView = {
+export type RunView = {
     id: string;
+    store: string;
     source: string;
     status: string;
     productCount: number;
@@ -24,11 +26,11 @@ export type CostcoRunView = {
     finishedAt: string | null;
 };
 
-export type CostcoProductView = Product & {
+export type ProductView = Product & {
     updatedAt: string;
 };
 
-export type CostcoPriceHistoryView = {
+export type PriceHistoryView = {
     sku: string;
     price: number;
     currency: string;
@@ -37,23 +39,24 @@ export type CostcoPriceHistoryView = {
     capturedAt: string;
 };
 
-export type CostcoCrawlerStatus = {
-    lastRun: CostcoRunView | null;
+export type CrawlerStatus = {
+    lastRun: RunView | null;
     productCount: number;
     lastError: string | null;
 };
 
-export type CostcoPriceSignalSource = {
+export type PriceSignalSource = {
     sku: string;
-    prices: CostcoPriceHistoryView[];
+    prices: PriceHistoryView[];
 };
 
-export interface CostcoProductRepository {
-    upsertMany(products: Product[], context?: ProductUpsertContext): Promise<void>;
+export interface ProductRepository {
+    upsertMany(products: Product[], context: ProductUpsertContext): Promise<void>;
 }
 
-export interface CostcoCrawlRunRepository {
+export interface CrawlRunRepository {
     startRun(input: {
+        store: string;
         source: string;
         startedAt: Date;
     }): Promise<StartedCrawlRun>;
@@ -66,24 +69,35 @@ export interface CostcoCrawlRunRepository {
     }): Promise<void>;
 }
 
-export interface CostcoReadRepository {
-    listRuns(limit: number): Promise<CostcoRunView[]>;
-    listProducts(limit: number): Promise<CostcoProductView[]>;
-    listPriceHistory(sku: string, limit: number): Promise<CostcoPriceHistoryView[]>;
-    getStatus(): Promise<CostcoCrawlerStatus>;
-    listLatestPriceSignals(limit?: number): Promise<CostcoPriceSignalSource[]>;
+export interface ReadRepository {
+    listRuns(store: string, limit: number): Promise<RunView[]>;
+    listProducts(store: string, limit: number): Promise<ProductView[]>;
+    listPriceHistory(store: string, sku: string, limit: number): Promise<PriceHistoryView[]>;
+    getStatus(store: string): Promise<CrawlerStatus>;
+    listLatestPriceSignals(store: string, limit?: number): Promise<PriceSignalSource[]>;
 }
 
-export class PrismaCostcoProductRepository implements CostcoProductRepository {
+export class PrismaProductRepository implements ProductRepository {
     constructor(private readonly client: PrismaClient = prisma) {}
 
-    async upsertMany(products: Product[], context?: ProductUpsertContext): Promise<void> {
+    async upsertMany(products: Product[], context: ProductUpsertContext): Promise<void> {
         for (const product of products) {
-            await this.client.costcoProduct.upsert({
+            await this.client.product.upsert({
                 where: {
-                    sku: product.sku,
+                    store_sku: {
+                        store: context.store,
+                        sku: product.sku,
+                    },
                 },
-                create: product,
+                create: {
+                    store: context.store,
+                    sku: product.sku,
+                    name: product.name,
+                    price: product.price,
+                    category: product.category,
+                    image: product.image,
+                    url: product.url,
+                },
                 update: {
                     name: product.name,
                     price: product.price,
@@ -93,26 +107,28 @@ export class PrismaCostcoProductRepository implements CostcoProductRepository {
                 },
             });
 
-            await this.client.costcoPriceHistory.create({
+            await this.client.priceHistory.create({
                 data: {
+                    store: context.store,
                     sku: product.sku,
                     price: product.price,
                     currency: 'USD',
-                    source: context?.source || 'unknown',
-                    crawlRunId: context?.crawlRunId,
-                    capturedAt: context?.capturedAt || new Date(),
+                    source: context.source,
+                    crawlRunId: context.crawlRunId,
+                    capturedAt: context.capturedAt,
                 },
             });
         }
     }
 }
 
-export class PrismaCostcoCrawlRunRepository implements CostcoCrawlRunRepository {
+export class PrismaCrawlRunRepository implements CrawlRunRepository {
     constructor(private readonly client: PrismaClient = prisma) {}
 
-    async startRun(input: { source: string; startedAt: Date }): Promise<StartedCrawlRun> {
-        return this.client.costcoCrawlRun.create({
+    async startRun(input: { store: string; source: string; startedAt: Date }): Promise<StartedCrawlRun> {
+        return this.client.crawlRun.create({
             data: {
+                store: input.store,
                 source: input.source,
                 status: 'running',
                 productCount: 0,
@@ -131,7 +147,7 @@ export class PrismaCostcoCrawlRunRepository implements CostcoCrawlRunRepository 
         errorMessage?: string;
         finishedAt: Date;
     }): Promise<void> {
-        await this.client.costcoCrawlRun.update({
+        await this.client.crawlRun.update({
             where: {
                 id: input.id,
             },
@@ -145,11 +161,14 @@ export class PrismaCostcoCrawlRunRepository implements CostcoCrawlRunRepository 
     }
 }
 
-export class PrismaCostcoReadRepository implements CostcoReadRepository {
+export class PrismaReadRepository implements ReadRepository {
     constructor(private readonly client: PrismaClient = prisma) {}
 
-    async listRuns(limit: number): Promise<CostcoRunView[]> {
-        const runs = await this.client.costcoCrawlRun.findMany({
+    async listRuns(store: string, limit: number): Promise<RunView[]> {
+        const runs = await this.client.crawlRun.findMany({
+            where: {
+                store,
+            },
             orderBy: {
                 startedAt: 'desc',
             },
@@ -159,8 +178,11 @@ export class PrismaCostcoReadRepository implements CostcoReadRepository {
         return runs.map(toRunView);
     }
 
-    async listProducts(limit: number): Promise<CostcoProductView[]> {
-        const products = await this.client.costcoProduct.findMany({
+    async listProducts(store: string, limit: number): Promise<ProductView[]> {
+        const products = await this.client.product.findMany({
+            where: {
+                store,
+            },
             orderBy: {
                 updatedAt: 'desc',
             },
@@ -178,9 +200,10 @@ export class PrismaCostcoReadRepository implements CostcoReadRepository {
         }));
     }
 
-    async listPriceHistory(sku: string, limit: number): Promise<CostcoPriceHistoryView[]> {
-        const history = await this.client.costcoPriceHistory.findMany({
+    async listPriceHistory(store: string, sku: string, limit: number): Promise<PriceHistoryView[]> {
+        const history = await this.client.priceHistory.findMany({
             where: {
+                store,
                 sku,
             },
             orderBy: {
@@ -192,16 +215,24 @@ export class PrismaCostcoReadRepository implements CostcoReadRepository {
         return history.map(toPriceHistoryView);
     }
 
-    async getStatus(): Promise<CostcoCrawlerStatus> {
+    async getStatus(store: string): Promise<CrawlerStatus> {
         const [lastRun, productCount, lastFailedRun] = await Promise.all([
-            this.client.costcoCrawlRun.findFirst({
+            this.client.crawlRun.findFirst({
+                where: {
+                    store,
+                },
                 orderBy: {
                     startedAt: 'desc',
                 },
             }),
-            this.client.costcoProduct.count(),
-            this.client.costcoCrawlRun.findFirst({
+            this.client.product.count({
                 where: {
+                    store,
+                },
+            }),
+            this.client.crawlRun.findFirst({
+                where: {
+                    store,
                     status: 'failed',
                 },
                 orderBy: {
@@ -217,8 +248,11 @@ export class PrismaCostcoReadRepository implements CostcoReadRepository {
         };
     }
 
-    async listLatestPriceSignals(limit = 10): Promise<CostcoPriceSignalSource[]> {
-        const products = await this.client.costcoProduct.findMany({
+    async listLatestPriceSignals(store: string, limit = 10): Promise<PriceSignalSource[]> {
+        const products = await this.client.product.findMany({
+            where: {
+                store,
+            },
             orderBy: {
                 updatedAt: 'desc',
             },
@@ -228,10 +262,10 @@ export class PrismaCostcoReadRepository implements CostcoReadRepository {
             },
         });
 
-        const signals: CostcoPriceSignalSource[] = [];
+        const signals: PriceSignalSource[] = [];
 
         for (const product of products) {
-            const prices = await this.listPriceHistory(product.sku, 2);
+            const prices = await this.listPriceHistory(store, product.sku, 2);
             signals.push({
                 sku: product.sku,
                 prices,
@@ -244,15 +278,17 @@ export class PrismaCostcoReadRepository implements CostcoReadRepository {
 
 function toRunView(run: {
     id: string;
+    store: string;
     source: string;
     status: string;
     productCount: number;
     errorMessage: string | null;
     startedAt: Date;
     finishedAt: Date | null;
-}): CostcoRunView {
+}): RunView {
     return {
         id: run.id,
+        store: run.store,
         source: run.source,
         status: run.status,
         productCount: run.productCount,
@@ -269,7 +305,7 @@ function toPriceHistoryView(history: {
     source: string;
     crawlRunId: string | null;
     capturedAt: Date;
-}): CostcoPriceHistoryView {
+}): PriceHistoryView {
     return {
         sku: history.sku,
         price: Number(history.price),

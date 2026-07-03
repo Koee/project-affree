@@ -92,19 +92,32 @@ async function clickBhxCheapestStoreBuyButton(
         .first();
 
     await expect(buyButton).toBeVisible({ timeout: 30_000 });
-    await buyButton.click();
 
     const formMarker = page
         .getByText(/nguoi nhan|người nhận|so dien thoai|số điện thoại|de tro ly dat giup|để trợ lý đặt giúp/i)
         .first();
 
-    if (!(await formMarker.isVisible({ timeout: 3_000 }).catch(() => false))) {
-        const addToCartButton = bhxStoreCard
-            .getByRole('button', { name: /them vao gio|thêm vào giỏ|\+/i })
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+        await buyButton.click();
+
+        if (await formMarker.isVisible({ timeout: 10_000 }).catch(() => false)) {
+            break;
+        }
+
+        if (attempt < 3) {
+            await page.waitForTimeout(1_000);
+        }
+    }
+
+    if (!(await formMarker.isVisible({ timeout: 5_000 }).catch(() => false))) {
+        const cartButton = page
+            .getByRole('button', { name: /gio hang|giỏ hàng/i })
             .first();
 
-        if (await addToCartButton.isVisible({ timeout: 3_000 }).catch(() => false)) {
-            await addToCartButton.click({ force: true });
+        if (await cartButton.isVisible({ timeout: 5_000 }).catch(() => false)) {
+            await cartButton.click();
+
+            await formMarker.isVisible({ timeout: 10_000 }).catch(() => undefined);
         }
     }
 

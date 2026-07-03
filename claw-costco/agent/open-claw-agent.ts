@@ -4,7 +4,7 @@ import type {
     CrawlerRegistration,
     StoreName,
 } from './open-claw-types';
-import type { CrawlAgent, CrawlJobInput } from '../claw-costco/agent/types';
+import type { CrawlAgent, CrawlJobInput } from './types';
 
 export class OpenClawAgent {
     private readonly crawlers = new Map<StoreName, CrawlerRegistration>();

@@ -8,9 +8,10 @@ datasource costco {
   directUrl = env("DIRECT_URL_COSTCO")
 }
 
-model CostcoProduct {
+model Product {
   id        String   @id @default(cuid())
-  sku       String   @unique
+  store     String
+  sku       String
   name      String
   price     Decimal
   category  String
@@ -18,10 +19,14 @@ model CostcoProduct {
   url       String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([store, sku])
+  @@index([store])
 }
 
-model CostcoPriceHistory {
+model PriceHistory {
   id          String   @id @default(cuid())
+  store       String
   sku         String
   price       Decimal
   currency    String   @default("USD")
@@ -30,13 +35,14 @@ model CostcoPriceHistory {
   capturedAt  DateTime
   createdAt   DateTime @default(now())
 
-  @@index([sku])
+  @@index([store, sku])
   @@index([capturedAt])
   @@index([crawlRunId])
 }
 
-model CostcoCrawlRun {
+model CrawlRun {
   id             String   @id @default(cuid())
+  store          String
   source         String
   status         String
   productCount   Int      @default(0)
@@ -44,4 +50,6 @@ model CostcoCrawlRun {
   startedAt      DateTime
   finishedAt     DateTime?
   createdAt      DateTime @default(now())
+
+  @@index([store])
 }

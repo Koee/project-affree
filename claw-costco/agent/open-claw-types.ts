@@ -1,7 +1,7 @@
-import type { Product } from '../claw-costco/types/product';
-import type { CrawlJobSource } from '../claw-costco/agent/types';
+import type { Product } from '../types/product';
+import type { CrawlJobSource } from './types';
 
-export type StoreName = 'costco' | string;
+export type StoreName = 'costco' | 'premium-outlets' | 'walmart' | string;
 
 export type OpenClawCrawlInput = {
     store: StoreName;
