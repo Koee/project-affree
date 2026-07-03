@@ -23,6 +23,7 @@
         "tests/**/*.ts",
         "claw-costco/**/*.ts",
         "claw-data-costco/**/*.ts",
+        "src/**/*.ts",
         "playwright.config.ts",
         "components/location.component.ts"
     ],
