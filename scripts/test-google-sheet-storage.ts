@@ -127,6 +127,42 @@ async function main() {
     await storage.saveRawPayload(rawPayload);
     console.log('=> saveRawPayload thành công!\n');
 
+    // 10. Test cập nhật CrawlRun thành SUCCESS
+    console.log('[9] Đang kiểm tra cập nhật CrawlRun thành SUCCESS...');
+    const updatedCrawlRun: CrawlRunDTO = {
+        ...crawlRun,
+        status: 'success',
+        productCount: 15,
+        finishedAt: new Date()
+    };
+    await storage.saveCrawlRun(updatedCrawlRun);
+    console.log('=> Cập nhật CrawlRun thành SUCCESS thành công!\n');
+
+    // 11. Test CrawlRun FAILED (Tạo mới -> Cập nhật lỗi)
+    console.log('[10] Đang kiểm tra tạo mới và cập nhật CrawlRun thành FAILED...');
+    const failedRunId = `run-failed-${Date.now()}`;
+    const failedCrawlRun: CrawlRunDTO = {
+        id: failedRunId,
+        store: 'premiumoutlets',
+        source: 'automated-test',
+        status: 'running',
+        productCount: 0,
+        errorMessage: null,
+        startedAt: new Date()
+    };
+    console.log('  10.1 Đang tạo lượt chạy chạy lỗi...');
+    await storage.saveCrawlRun(failedCrawlRun);
+    
+    console.log('  10.2 Đang cập nhật lượt chạy thành FAILED...');
+    const finalFailedCrawlRun: CrawlRunDTO = {
+        ...failedCrawlRun,
+        status: 'failed',
+        errorMessage: 'Network timeout during navigation',
+        finishedAt: new Date()
+    };
+    await storage.saveCrawlRun(finalFailedCrawlRun);
+    console.log('=> Cập nhật CrawlRun thành FAILED thành công!\n');
+
     console.log('=== KIỂM THỬ THÀNH CÔNG TOÀN BỘ 6 PHƯƠNG THỨC TRÊN GOOGLE SHEET STORAGE LAYER ===');
 }
 

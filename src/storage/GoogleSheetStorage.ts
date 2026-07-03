@@ -228,12 +228,29 @@ export class GoogleSheetStorage implements IStorageService {
 
     async saveCrawlRun(crawlRun: CrawlRunDTO): Promise<void> {
         return this.withRetry(async () => {
-            logger.info({ id: crawlRun.id, store: crawlRun.store }, 'Saving crawl run to Google Sheet');
+            logger.info({ id: crawlRun.id, store: crawlRun.store, status: crawlRun.status }, 'Saving crawl run to Google Sheet');
             
             await this.ensureHeader('CrawlRuns', ['id', 'store', 'source', 'status', 'productCount', 'errorMessage', 'startedAt', 'finishedAt']);
             
+            const rows = await this.sheetService.readRows('CrawlRuns');
+            
+            let rowIndex = -1;
+            if (crawlRun.id) {
+                rowIndex = rows.findIndex((row, idx) => {
+                    if (idx === 0) return false;
+                    return row[0] === crawlRun.id;
+                });
+            }
+
             const row = this.crawlRunToRow(crawlRun);
-            await this.sheetService.appendRow('CrawlRuns', row);
+
+            if (rowIndex !== -1) {
+                logger.info({ id: crawlRun.id, rowIndex: rowIndex + 1 }, 'Crawl run already exists. Updating crawl run details.');
+                await this.sheetService.updateRow('CrawlRuns', rowIndex + 1, row);
+            } else {
+                logger.info({ id: crawlRun.id }, 'Crawl run does not exist. Appending new crawl run.');
+                await this.sheetService.appendRow('CrawlRuns', row);
+            }
         });
     }
 
