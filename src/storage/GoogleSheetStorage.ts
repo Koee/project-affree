@@ -51,6 +51,21 @@ export class GoogleSheetStorage implements IStorageService {
         }
     }
 
+    /**
+     * Parse giá trị số từ ô của Google Sheet một cách an toàn.
+     * Hỗ trợ trường hợp locale sử dụng dấu phẩy làm dấu ngăn cách thập phân.
+     */
+    private parsePrice(val: any): number {
+        if (val === undefined || val === null) return 0;
+        const num = Number(val);
+        if (!isNaN(num)) return num;
+
+        // Nếu là chuỗi, thử thay thế dấu phẩy bằng dấu chấm
+        const str = val.toString().replace(/,/g, '.').replace(/[^\d.-]/g, '');
+        const parsed = parseFloat(str);
+        return isNaN(parsed) ? 0 : parsed;
+    }
+
     // ==========================================
     // MAPPERS GIỮA DTO VÀ HÀNG GOOGLE SHEETS
     // ==========================================
@@ -61,7 +76,7 @@ export class GoogleSheetStorage implements IStorageService {
             store: row[0]?.toString() || '',
             sku: row[1]?.toString() || '',
             name: row[2]?.toString() || '',
-            price: Number(row[3]) || 0,
+            price: this.parsePrice(row[3]),
             category: row[4]?.toString() || '',
             image: row[5]?.toString() || '',
             url: row[6]?.toString() || '',
