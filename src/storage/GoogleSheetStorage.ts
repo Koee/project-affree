@@ -131,15 +131,13 @@ export class GoogleSheetStorage implements IStorageService {
         ];
     }
 
-    // PriceHistory Sheet: [store, sku, price, currency, source, crawlRunId, capturedAt]
+    // PriceHistory Sheet: [store, sku, price, currency, capturedAt]
     private priceHistoryToRow(ph: PriceHistoryDTO): SheetRow {
         return [
             ph.store,
             ph.sku,
             ph.price,
             ph.currency || 'USD',
-            ph.source,
-            ph.crawlRunId || '',
             ph.capturedAt ? ph.capturedAt.toISOString() : new Date().toISOString(),
         ];
     }
@@ -210,7 +208,7 @@ export class GoogleSheetStorage implements IStorageService {
         return this.withRetry(async () => {
             logger.info({ store: priceHistory.store, sku: priceHistory.sku, price: priceHistory.price }, 'Saving price history to Google Sheet');
             
-            await this.ensureHeader('PriceHistory', ['store', 'sku', 'price', 'currency', 'source', 'crawlRunId', 'capturedAt']);
+            await this.ensureHeader('PriceHistory', ['store', 'sku', 'price', 'currency', 'capturedAt']);
             
             const row = this.priceHistoryToRow(priceHistory);
             await this.sheetService.appendRow('PriceHistory', row);
