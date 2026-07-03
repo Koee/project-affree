@@ -133,4 +133,72 @@ test.describe('@claw-costco product parser', () => {
             },
         ]);
     });
+
+    test('should parse product details from a Product Detail Page (PDP) including price API fallback', async ({ page }) => {
+        // Mock the display-price API call from page evaluate fetch
+        await page.route('**/display-price-lite**', async (route) => {
+            await route.fulfill({
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    priceData: {
+                        id: '1082396',
+                        displayPrice: {
+                            onlinePrice: 37.99,
+                            deliveredPrice: 30.99,
+                        }
+                    }
+                })
+            });
+        });
+
+        // Set the mock PDP HTML page content via route redirection to avoid about:blank pushState issue
+        await page.route('https://www.costco.com/p/-/qunol/100301666', async (route) => {
+            await route.fulfill({
+                contentType: 'text/html',
+                body: `
+                    <html>
+                        <body>
+                            <div id="crumbs">
+                                <a class="MuiLink-root MuiLink-underlineHover" href="/home">Home</a>
+                                <a class="MuiLink-root MuiLink-underlineHover" href="/health">Health & Personal Care</a>
+                                <a class="MuiLink-root MuiLink-underlineHover" href="/vitamins">Vitamins</a>
+                            </div>
+                            
+                            <h1 itemprop="name">Qunol Plus CoQ10 Ubiquinol 200 mg. with Omega-3, 90 Softgels</h1>
+                            
+                            <span id="product-body-item-number">Item 1082396</span>
+                            
+                            <div class="product-image">
+                                <button id="product_hero_btn">
+                                    <img src="/hero.jpg" alt="Qunol" />
+                                </button>
+                            </div>
+                            
+                            <!-- DOM price is blank/requires sign-in to test fallback -->
+                            <span id="pull-right-price" class="price">Sign in to show price</span>
+                        </body>
+                    </html>
+                `
+            });
+        });
+
+        await page.goto('https://www.costco.com/p/-/qunol/100301666');
+
+        const products = await extractCostcoProductsFromPage(page, {
+            category: 'health',
+            productUrl: 'https://www.costco.com/p/-/qunol/100301666',
+            baseUrl: 'https://www.costco.com'
+        });
+
+        expect(products).toEqual([
+            {
+                sku: '1082396',
+                name: 'Qunol Plus CoQ10 Ubiquinol 200 mg. with Omega-3, 90 Softgels',
+                price: 30.99, // obtained from API mock fallback
+                category: 'Vitamins', // last breadcrumb
+                image: 'https://www.costco.com/hero.jpg', // absolute url from /hero.jpg
+                url: 'https://www.costco.com/p/-/qunol/100301666' // page URL
+            }
+        ]);
+    });
 });

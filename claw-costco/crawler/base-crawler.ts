@@ -24,15 +24,16 @@ export abstract class BaseCrawler {
         try {
             const page = await browser.newPage();
 
-            if (input.categoryUrl) {
-                await page.goto(input.categoryUrl, { waitUntil: 'domcontentloaded' });
+            const targetUrl = input.productUrl || input.categoryUrl;
+            if (targetUrl) {
+                await page.goto(targetUrl, { waitUntil: 'domcontentloaded' });
             }
 
             const parser = this.createParser();
             return parser.extractProductsFromPage(page, {
                 category: input.category || 'unknown',
                 limit: input.limit,
-                baseUrl: input.categoryUrl || this.getBaseUrl(),
+                baseUrl: input.productUrl || input.categoryUrl || this.getBaseUrl(),
                 productName: input.productName,
                 productUrl: input.productUrl,
             });
