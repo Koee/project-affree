@@ -123,6 +123,20 @@ export class PrismaProductRepository implements ProductRepository {
                     crawlRunId: context.crawlRunId,
                     capturedAt: context.capturedAt,
                 });
+
+                await this.storage.saveRawPayload({
+                    store: context.store,
+                    sku: product.sku,
+                    payload: {
+                        name: product.name,
+                        price: product.price,
+                        category: product.category,
+                        image: product.image,
+                        url: product.url,
+                        capturedAt: context.capturedAt ? context.capturedAt.toISOString() : new Date().toISOString(),
+                    },
+                    crawlRunId: context.crawlRunId || '',
+                });
             }
         } else if (this.client) {
             for (const product of products) {
