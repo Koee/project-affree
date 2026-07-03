@@ -14,6 +14,7 @@
     "prisma:costco:validate": "cross-env DOTENV_CONFIG_PATH=.env.costco node -r dotenv/config ./node_modules/prisma/build/index.js validate --schema prisma/schema.prisma",
     "prisma:costco:migrate": "cross-env DOTENV_CONFIG_PATH=.env.costco node -r dotenv/config ./node_modules/prisma/build/index.js migrate deploy --schema prisma/schema.prisma",
     "prisma:costco:migrate:dev": "cross-env DOTENV_CONFIG_PATH=.env.costco node -r dotenv/config ./node_modules/prisma/build/index.js migrate dev --schema prisma/schema.prisma",
+    "prisma:costco:pull": "cross-env DOTENV_CONFIG_PATH=.env.costco node -r dotenv/config ./node_modules/prisma/build/index.js db pull --schema prisma/schema.prisma",
     "test:p0:data": "npx playwright test --project=api-data-contract --grep \"@p0 @contract\"",
     "test:contract": "npx playwright test --project=api-data-contract --grep \"@contract\"",
     "report": "npx playwright show-report reports/html-report"
