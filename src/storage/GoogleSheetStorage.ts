@@ -14,6 +14,9 @@ export class GoogleSheetStorage implements IStorageService {
     private readonly retries: number;
     private readonly retryDelayMs: number;
 
+    // Bộ nhớ đệm lưu trữ danh sách sản phẩm trong runtime để tránh đọc API liên tục
+    private productsCache: Map<string, { rowIndex: number; product: ProductDTO }> | null = null;
+
     constructor(sheetService: GoogleSheetService, retries = 3, retryDelayMs = 1000) {
         this.sheetService = sheetService;
         this.retries = retries;
@@ -64,6 +67,37 @@ export class GoogleSheetStorage implements IStorageService {
         const str = val.toString().replace(/,/g, '.').replace(/[^\d.-]/g, '');
         const parsed = parseFloat(str);
         return isNaN(parsed) ? 0 : parsed;
+    }
+
+    /**
+     * Nạp cache từ Google Sheet nếu cache chưa được khởi tạo.
+     */
+    private async loadProductsCacheIfEmpty(): Promise<Map<string, { rowIndex: number; product: ProductDTO }>> {
+        if (this.productsCache) {
+            return this.productsCache;
+        }
+
+        logger.info('Initializing runtime cache for Products sheet');
+        const rows = await this.sheetService.readRows('Products');
+        const cache = new Map<string, { rowIndex: number; product: ProductDTO }>();
+
+        // Duyệt từ index 1 (bỏ qua dòng tiêu đề)
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            const store = row[0]?.toString();
+            const sku = row[1]?.toString();
+            if (store && sku) {
+                const key = `${store}_${sku}`;
+                cache.set(key, {
+                    rowIndex: i + 1, // 1-based index trên Google Sheet
+                    product: this.rowToProduct(row)
+                });
+            }
+        }
+
+        this.productsCache = cache;
+        logger.info({ cacheSize: cache.size }, 'Runtime cache for Products initialized');
+        return cache;
     }
 
     // ==========================================
@@ -141,20 +175,33 @@ export class GoogleSheetStorage implements IStorageService {
 
     async saveProduct(product: ProductDTO): Promise<void> {
         return this.withRetry(async () => {
-            logger.info({ store: product.store, sku: product.sku }, 'Saving product to Google Sheet');
+            logger.info({ store: product.store, sku: product.sku }, 'Saving product to Google Sheet (using cache)');
             
             // Đảm bảo có header trước khi làm bất kỳ hành động nào
             await this.ensureHeader('Products', ['store', 'sku', 'name', 'price', 'category', 'image', 'url', 'updatedAt']);
 
-            const existing = await this.findProduct(product.store, product.sku);
+            const cache = await this.loadProductsCacheIfEmpty();
+            const key = `${product.store}_${product.sku}`;
+            const entry = cache.get(key);
             
-            if (existing) {
-                logger.info({ store: product.store, sku: product.sku }, 'Product already exists. Updating product details.');
+            if (entry) {
+                logger.info({ store: product.store, sku: product.sku }, 'Product already exists in cache. Updating product details.');
                 await this.updateProduct(product.store, product.sku, product);
             } else {
-                logger.info({ store: product.store, sku: product.sku }, 'Product does not exist. Appending new product.');
+                logger.info({ store: product.store, sku: product.sku }, 'Product does not exist in cache. Appending new product.');
                 const row = this.productToRow(product);
                 await this.sheetService.appendRow('Products', row);
+
+                // Dòng mới được chèn vào dòng: header (1) + cache.size + 1 (append mới) = cache.size + 2
+                const newRowIndex = cache.size + 2;
+                cache.set(key, {
+                    rowIndex: newRowIndex,
+                    product: {
+                        ...product,
+                        updatedAt: product.updatedAt || new Date()
+                    }
+                });
+                logger.info({ store: product.store, sku: product.sku, rowIndex: newRowIndex }, 'Product appended and cached');
             }
         });
     }
@@ -194,54 +241,52 @@ export class GoogleSheetStorage implements IStorageService {
 
     async updateProduct(store: string, sku: string, data: Partial<ProductDTO>): Promise<void> {
         return this.withRetry(async () => {
-            logger.info({ store, sku }, 'Updating product in Google Sheet');
-            const rows = await this.sheetService.readRows('Products');
-
-            // Tìm dòng khớp store và sku, bỏ qua dòng tiêu đề (index 0)
-            const rowIndex = rows.findIndex((row, idx) => {
-                if (idx === 0) return false;
-                return row[0] === store && row[1] === sku;
-            });
-
-            if (rowIndex === -1) {
-                logger.warn({ store, sku }, 'Product to update not found in Google Sheets');
+            logger.info({ store, sku }, 'Updating product in Google Sheet (using cache)');
+            await this.ensureHeader('Products', ['store', 'sku', 'name', 'price', 'category', 'image', 'url', 'updatedAt']);
+            const cache = await this.loadProductsCacheIfEmpty();
+            const key = `${store}_${sku}`;
+            const entry = cache.get(key);
+ 
+            if (!entry) {
+                logger.warn({ store, sku }, 'Product to update not found in runtime cache');
                 throw new Error(`Product not found for update: store=${store}, sku=${sku}`);
             }
 
-            const existingRow = rows[rowIndex];
-            const existingProduct = this.rowToProduct(existingRow);
-
             // Gộp dữ liệu cập nhật
             const updatedProduct: ProductDTO = {
-                ...existingProduct,
+                ...entry.product,
                 ...data,
                 updatedAt: new Date()
             };
 
             const updatedRow = this.productToRow(updatedProduct);
-            // rowIndex là 0-indexed trong mảng kết quả, nên dòng tương ứng trên Sheet là rowIndex + 1 (1-based)
-            await this.sheetService.updateRow('Products', rowIndex + 1, updatedRow);
-            logger.info({ store, sku }, 'Product updated successfully in Google Sheet');
+            // Cập nhật dòng theo rowIndex đã cache
+            await this.sheetService.updateRow('Products', entry.rowIndex, updatedRow);
+
+            // Đồng bộ lại vào cache
+            cache.set(key, {
+                rowIndex: entry.rowIndex,
+                product: updatedProduct
+            });
+            logger.info({ store, sku, rowIndex: entry.rowIndex }, 'Product updated successfully in sheet and cache');
         });
     }
 
     async findProduct(store: string, sku: string): Promise<ProductDTO | null> {
         return this.withRetry(async () => {
-            logger.info({ store, sku }, 'Finding product in Google Sheet');
-            const rows = await this.sheetService.readRows('Products');
+            logger.info({ store, sku }, 'Finding product in Google Sheet (using cache)');
+            await this.ensureHeader('Products', ['store', 'sku', 'name', 'price', 'category', 'image', 'url', 'updatedAt']);
+            const cache = await this.loadProductsCacheIfEmpty();
+            const key = `${store}_${sku}`;
+            const entry = cache.get(key);
 
-            // Tìm dòng khớp store và sku, bỏ qua dòng header
-            const foundRow = rows.find((row, idx) => {
-                if (idx === 0) return false;
-                return row[0] === store && row[1] === sku;
-            });
-
-            if (!foundRow) {
-                logger.info({ store, sku }, 'Product not found in Google Sheet');
+            if (!entry) {
+                logger.info({ store, sku }, 'Product not found in runtime cache');
                 return null;
             }
 
-            return this.rowToProduct(foundRow);
+            logger.info({ store, sku }, 'Product found in runtime cache');
+            return entry.product;
         });
     }
 }
