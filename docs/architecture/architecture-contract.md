@@ -1,6 +1,6 @@
 # Architecture Contract
 
-This document defines the system-wide architecture contracts, data transfer formats, database schemas, API endpoints, and AI Agent interaction boundaries for the Project-Affree crawler and QA automation system.
+This document defines the system-wide architecture contracts, data transfer formats, database schemas, API endpoints, and AI Agent interaction boundaries for the clawer-db crawler and QA automation system.
 
 ---
 

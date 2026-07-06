@@ -1,4 +1,4 @@
-# Đánh Giá Milestone (M0–M8) — Repo Project-Affree
+# Đánh Giá Milestone (M0–M8) — Repo clawer-db
 
 > Ngày: 2026-07-03  
 > Scope: `claw-costco/`, `claw-data-costco/`, `prisma/schema.prisma`, `tests/`, `playwright.config.ts`  

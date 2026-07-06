@@ -24,7 +24,7 @@ import {
 
 const orderProductName = 'Bia Tiger Crystal lốc 6 lon x 330ml';
 const coopProductName = 'Sữa tươi Vinamilk có đường 1L';
-const bhxProductName = 'Trà xanh Không Độ chanh 455ml';
+const bhxProductName = 'Rượu soju Heejin vị đào 12% chai 360ml';
 const mlblAgentWaitMs = Number(process.env.ORDER_AGENT_WAIT_MS || 120_000);
 const coopAgentWaitMs = Number(process.env.ORDER_AGENT_WAIT_MS || 120_000);
 const bhxAgentWaitMs = Number(process.env.ORDER_AGENT_WAIT_MS || 30_000);

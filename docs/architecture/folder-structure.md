@@ -1,13 +1,13 @@
 # Folder Structure
 
-This document describes the directory hierarchy and the responsibility layer assigned to each folder in the Project-Affree repository.
+This document describes the directory hierarchy and the responsibility layer assigned to each folder in the clawer-db repository.
 
 ---
 
 ## 1. Project Directory Tree
 
 ```
-Project-Affree/
+clawer-db/
 ├── claw-costco/               # Main crawler microservice
 │   ├── agent/                 # Agent orchestration layer
 │   ├── api/                   # Fastify HTTP server & controllers
