@@ -1,5 +1,5 @@
 {
-  "name": "project-affree",
+  "name": "clawer-db",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -8,14 +8,13 @@
     "test:staging": "cross-env TEST_ENV=staging playwright test",
     "test:demo": "cross-env TEST_ENV=demo playwright test",
     "test:claw-costco": "npx playwright test --project=claw-costco --reporter=list --output=test-results/claw-costco-cli",
-    "test:claw-data-costco": "npx playwright test --project=claw-data-costco --reporter=list",
     "build": "tsc -p tsconfig.json",
     "claw:costco:start": "node dist/claw-costco/index.js",
-    "claw:data-costco:start": "node dist/claw-data-costco/index.js",
     "prisma:costco:generate": "cross-env DOTENV_CONFIG_PATH=.env.costco node -r dotenv/config ./node_modules/prisma/build/index.js generate --schema prisma/schema.prisma",
     "prisma:costco:validate": "cross-env DOTENV_CONFIG_PATH=.env.costco node -r dotenv/config ./node_modules/prisma/build/index.js validate --schema prisma/schema.prisma",
     "prisma:costco:migrate": "cross-env DOTENV_CONFIG_PATH=.env.costco node -r dotenv/config ./node_modules/prisma/build/index.js migrate deploy --schema prisma/schema.prisma",
     "prisma:costco:migrate:dev": "cross-env DOTENV_CONFIG_PATH=.env.costco node -r dotenv/config ./node_modules/prisma/build/index.js migrate dev --schema prisma/schema.prisma",
+    "prisma:costco:pull": "cross-env DOTENV_CONFIG_PATH=.env.costco node -r dotenv/config ./node_modules/prisma/build/index.js db pull --schema prisma/schema.prisma",
     "test:p0:data": "npx playwright test --project=api-data-contract --grep \"@p0 @contract\"",
     "test:contract": "npx playwright test --project=api-data-contract --grep \"@contract\"",
     "report": "npx playwright show-report reports/html-report"
@@ -34,6 +33,7 @@
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "fastify": "^5.9.0",
+    "googleapis": "^173.0.0",
     "node-cron": "^4.5.0",
     "pino": "^10.3.1",
     "prisma": "^6.19.3",

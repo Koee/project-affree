@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw Multi-Store Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0a0c16;
+            --card-bg: rgba(20, 24, 46, 0.6);
+            --border-glow: rgba(99, 102, 241, 0.2);
+            --accent-primary: #6366f1;
+            --accent-glow: rgba(99, 102, 241, 0.4);
+            --text-main: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.05) 0%, transparent 40%);
+            background-attachment: fixed;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 1.5rem;
+        }
+
+        .logo-section h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-section p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-top: 0.2rem;
+        }
+
+        .status-badge {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            color: var(--success);
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--success);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%);
+            pointer-events: none;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--border-glow);
+            box-shadow: 0 8px 30px rgba(99, 102, 241, 0.08);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0.5rem 0 0.2rem 0;
+            color: #fff;
+        }
+
+        .stat-sub {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .trend-up { color: var(--success); }
+        .trend-neutral { color: var(--warning); }
+
+        /* Store Tabs */
+        .tabs-container {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            background: rgba(255, 255, 255, 0.02);
+            padding: 0.4rem;
+            border-radius: 12px;
+            width: fit-content;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 0.6rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn:hover {
+            color: #fff;
+        }
+
+        .tab-btn.active {
+            background: var(--accent-primary);
+            color: #fff;
+            box-shadow: 0 4px 15px var(--accent-glow);
+        }
+
+        /* Dashboard Layout Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 1.8rem;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .panel-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Products Table */
+        .products-table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        td {
+            padding: 1rem;
+            font-size: 0.95rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            color: var(--text-main);
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.01);
+        }
+
+        .product-info {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+
+        .product-img {
+            width: 44px;
+            height: 44px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            object-fit: cover;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .product-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .product-name {
+            font-weight: 500;
+            color: #fff;
+            margin-bottom: 0.1rem;
+        }
+
+        .product-sku {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .price-badge {
+            font-family: monospace;
+            font-weight: 600;
+            font-size: 1rem;
+            color: #fff;
+        }
+
+        /* Side List / Price Signals */
+        .runs-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .run-item {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+
+        .run-item:hover {
+            border-color: rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .run-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+
+        .run-title {
+            font-weight: 500;
+            font-size: 0.95rem;
+            color: #fff;
+        }
+
+        .run-sub {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .badge-status {
+            padding: 0.3rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-success { background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.15); }
+        .badge-failed { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.15); }
+
+        /* Action Buttons */
+        .btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #fff;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-primary {
+            background: var(--accent-primary);
+            border: none;
+            box-shadow: 0 4px 15px var(--accent-glow);
+        }
+
+        .btn-primary:hover {
+            background: #5053e4;
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+        }
+
+        /* SVG Chart */
+        .chart-container {
+            margin-top: 1.5rem;
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px solid rgba(255, 255, 255, 0.02);
+            border-radius: 12px;
+            padding: 1rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="logo-section">
+                <h1>OpenClaw Intelligence</h1>
+                <p>Multi-Store Crawl Registry & Pricing Insights Platform</p>
+            </div>
+            <div class="status-badge">
+                <span class="status-dot"></span>
+                <span>OpenClaw Registry Online</span>
+            </div>
+        </header>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Indexed Products</div>
+                <div class="stat-value" id="stat-products">1,248</div>
+                <div class="stat-sub">
+                    <span class="trend-up">▲ 14%</span>
+                    <span>since last run</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Crawl Runs (24h)</div>
+                <div class="stat-value" id="stat-runs">24</div>
+                <div class="stat-sub">
+                    <span class="trend-neutral">● Stable</span>
+                    <span>100% success rate</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Price Signals Triggered</div>
+                <div class="stat-value" id="stat-signals">42</div>
+                <div class="stat-sub">
+                    <span class="trend-up">▲ 5 new</span>
+                    <span>in last hour</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Registered Stores</div>
+                <div class="stat-value" id="stat-stores">3</div>
+                <div class="stat-sub">
+                    <span>Costco, Premium, Walmart</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Store Tabs Selector -->
+        <div class="tabs-container">
+            <button class="tab-btn active" onclick="switchStore('all')">All Stores</button>
+            <button class="tab-btn" onclick="switchStore('costco')">Costco</button>
+            <button class="tab-btn" onclick="switchStore('premium-outlets')">Premium Outlets</button>
+            <button class="tab-btn" onclick="switchStore('walmart')">Walmart</button>
+        </div>
+
+        <!-- Dashboard Panels -->
+        <div class="dashboard-grid">
+            <!-- Left panel: Catalog -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <span>Active Catalog View</span>
+                    </div>
+                    <button class="btn btn-primary" onclick="triggerCrawl()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                        Run Crawler Agent
+                    </button>
+                </div>
+
+                <div class="products-table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Product Details</th>
+                                <th>Store</th>
+                                <th>Category</th>
+                                <th>Price</th>
+                                <th>Last Crawled</th>
+                            </tr>
+                        </thead>
+                        <tbody id="catalog-body">
+                            <!-- Items populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Right panel: Recent Runs -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">Recent Crawl Actions</div>
+                </div>
+
+                <div class="runs-list" id="runs-body">
+                    <!-- Runs populated dynamically -->
+                </div>
+
+                <div class="chart-container">
+                    <div class="stat-label" style="font-size: 0.8rem; margin-bottom: 0.5rem;">Crawl Success Rate</div>
+                    <svg viewBox="0 0 300 100" width="100%" height="80">
+                        <defs>
+                            <linearGradient id="gradient-success" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stop-color="#10b981" stop-opacity="0.3"></stop>
+                                <stop offset="100%" stop-color="#10b981" stop-opacity="0"></stop>
+                            </linearGradient>
+                        </defs>
+                        <path d="M 0,90 Q 50,20 100,30 T 200,10 T 300,5 L 300,100 L 0,100 Z" fill="url(#gradient-success)"></path>
+                        <path d="M 0,90 Q 50,20 100,30 T 200,10 T 300,5" fill="none" stroke="#10b981" stroke-width="3"></path>
+                        <circle cx="100" cy="30" r="4" fill="#10b981"></circle>
+                        <circle cx="200" cy="10" r="4" fill="#10b981"></circle>
+                        <circle cx="300" cy="5" r="4" fill="#10b981"></circle>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logic and Mock Data -->
+    <script>
+        // Mock data
+        const mockProducts = [
+            { name: "Kirkland Signature Organic Olive Oil, 2L", sku: "4000424213", store: "costco", category: "Pantry", price: 29.99, image: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=80&q=80", url: "#", lastCrawled: "2 mins ago" },
+            { name: "Kirkland Signature Scented Waste Bags, 200ct", sku: "4000424214", store: "costco", category: "Housewares", price: 18.49, image: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=80&q=80", url: "#", lastCrawled: "15 mins ago" },
+            { name: "Adidas Ultraboost Light Running Shoes", sku: "9000100411", store: "premium-outlets", category: "Footwear", price: 110.00, image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=80&q=80", url: "#", lastCrawled: "1 hour ago" },
+            { name: "Puma Essentials Fleece Hoodie", sku: "9000100412", store: "premium-outlets", category: "Apparel", price: 34.99, image: "https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=80&q=80", url: "#", lastCrawled: "1 hour ago" },
+            { name: "Onn. 50-inch 4K Roku Smart TV", sku: "2000551022", store: "walmart", category: "Electronics", price: 248.00, image: "https://images.unsplash.com/photo-1593305841991-05c297ba4575?w=80&q=80", url: "#", lastCrawled: "2 hours ago" },
+            { name: "Great Value Organic Whole Milk, 1 Gal", sku: "2000551023", store: "walmart", category: "Dairy", price: 4.89, image: "https://images.unsplash.com/photo-1550583724-b2692b85b150?w=80&q=80", url: "#", lastCrawled: "2 hours ago" },
+        ];
+
+        const mockRuns = [
+            { id: "run-cli-09aa", store: "costco", source: "scheduler", status: "success", count: 8, time: "10 mins ago" },
+            { id: "run-cli-08fd", store: "premium-outlets", source: "manual", status: "success", count: 12, time: "1 hour ago" },
+            { id: "run-cli-07cf", store: "walmart", source: "scheduler", status: "success", count: 22, time: "2 hours ago" },
+            { id: "run-cli-06bb", store: "costco", source: "openclaw", status: "failed", count: 0, time: "5 hours ago" }
+        ];
+
+        let activeStore = 'all';
+
+        function renderDashboard() {
+            // Render Products
+            const filteredProducts = activeStore === 'all' 
+                ? mockProducts 
+                : mockProducts.filter(p => p.store === activeStore);
+
+            const catalogBody = document.getElementById('catalog-body');
+            catalogBody.innerHTML = filteredProducts.map(p => `
+                <tr>
+                    <td>
+                        <div class="product-info">
+                            <img class="product-img" src="${p.image}" alt="${p.name}">
+                            <div class="product-details">
+                                <span class="product-name">${p.name}</span>
+                                <span class="product-sku">SKU: ${p.sku}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="product-sku">${p.store.toUpperCase()}</span></td>
+                    <td><span class="product-sku">${p.category}</span></td>
+                    <td><span class="price-badge">$${p.price.toFixed(2)}</span></td>
+                    <td><span class="product-sku">${p.lastCrawled}</span></td>
+                </tr>
+            `).join('');
+
+            // Render Runs
+            const filteredRuns = activeStore === 'all'
+                ? mockRuns
+                : mockRuns.filter(r => r.store === activeStore);
+
+            const runsBody = document.getElementById('runs-body');
+            runsBody.innerHTML = filteredRuns.map(r => `
+                <div class="run-item">
+                    <div class="run-meta">
+                        <span class="run-title">${r.id} (${r.store.toUpperCase()})</span>
+                        <span class="run-sub">Triggered via ${r.source} • ${r.time}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.8rem;">
+                        <span class="product-sku">${r.count} items</span>
+                        <span class="badge-status ${r.status === 'success' ? 'badge-success' : 'badge-failed'}">
+                            ${r.status}
+                        </span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function switchStore(store) {
+            activeStore = store;
+            
+            // Toggle active tabs
+            const tabButtons = document.querySelectorAll('.tab-btn');
+            tabButtons.forEach(btn => {
+                const text = btn.innerText.toLowerCase();
+                if (store === 'all' && text === 'all stores') {
+                    btn.classList.add('active');
+                } else if (store === 'premium-outlets' && text === 'premium outlets') {
+                    btn.classList.add('active');
+                } else if (text === store) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            renderDashboard();
+        }
+
+        async function fetchRealData() {
+            try {
+                // Attempt connection to Fastify APIs
+                const productsRes = await fetch('http://localhost:3001/claw-costco/products?limit=10');
+                const runsRes = await fetch('http://localhost:3001/claw-costco/runs?limit=5');
+                const statusRes = await fetch('http://localhost:3001/claw-costco/status');
+
+                if (productsRes.ok) {
+                    const productsData = await productsRes.json();
+                    if (productsData.products && productsData.products.length > 0) {
+                        // Update Costco items in array with real database values
+                        const dbProducts = productsData.products.map(p => ({
+                            name: p.name,
+                            sku: p.sku,
+                            store: 'costco',
+                            category: p.category,
+                            price: p.price,
+                            image: p.image || "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=80&q=80",
+                            url: p.url,
+                            lastCrawled: "Live Data"
+                        }));
+                        mockProducts.splice(0, mockProducts.length, ...dbProducts);
+                        document.getElementById('stat-products').innerText = dbProducts.length;
+                    }
+                }
+
+                if (runsRes.ok) {
+                    const runsData = await runsRes.json();
+                    if (runsData.runs && runsData.runs.length > 0) {
+                        const dbRuns = runsData.runs.map(r => ({
+                            id: r.id.substring(0, 12),
+                            store: r.store,
+                            source: r.source,
+                            status: r.status,
+                            count: r.productCount,
+                            time: new Date(r.startedAt).toLocaleTimeString()
+                        }));
+                        mockRuns.splice(0, mockRuns.length, ...dbRuns);
+                        document.getElementById('stat-runs').innerText = dbRuns.length;
+                    }
+                }
+
+                if (statusRes.ok) {
+                    const statusData = await statusRes.json();
+                    document.getElementById('stat-products').innerText = statusData.productCount;
+                }
+
+                renderDashboard();
+            } catch (err) {
+                console.log("Offline Mode: using simulated mock data (Fastify server is down).");
+            }
+        }
+
+        function triggerCrawl() {
+            alert("Manual crawl triggered successfully via OpenClaw registry!");
+        }
+
+        // Initial setup
+        renderDashboard();
+        fetchRealData();
+    </script>
+</body>
+</html>

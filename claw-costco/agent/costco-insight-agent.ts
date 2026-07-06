@@ -1,4 +1,4 @@
-import type { CostcoReadRepository } from '../db/repositories';
+import type { ReadRepository } from '../db/repositories';
 
 export type CostcoPriceSignal = {
     sku: string;
@@ -19,12 +19,12 @@ export type CostcoInsightSummary = {
 };
 
 export class CostcoInsightAgent {
-    constructor(private readonly readRepository: CostcoReadRepository) {}
+    constructor(private readonly readRepository: ReadRepository) {}
 
     async buildSummary(): Promise<CostcoInsightSummary> {
         const [status, priceSignalSources] = await Promise.all([
-            this.readRepository.getStatus(),
-            this.readRepository.listLatestPriceSignals(10),
+            this.readRepository.getStatus('costco'),
+            this.readRepository.listLatestPriceSignals('costco', 10),
         ]);
 
         return {

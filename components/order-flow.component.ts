@@ -155,6 +155,26 @@ export class OrderFlowComponent {
         if (await blockingOverlay.isVisible({ timeout: 1_000 }).catch(() => false)) {
             await this.dismissLocationOverlay(blockingOverlay);
         }
+
+        // Wait up to 2 seconds for any post-selection modals/overlays (e.g. branch selection) to appear and dismiss them
+        const postOverlay = this.page.locator('.fixed.inset-0, [role="dialog"]').last();
+        const hasOverlay = await postOverlay
+            .waitFor({ state: 'visible', timeout: 2_000 })
+            .then(() => true)
+            .catch(() => false);
+
+        if (hasOverlay) {
+            await this.page.keyboard.press('Escape').catch(() => undefined);
+            if (await postOverlay.isVisible().catch(() => false)) {
+                const closeBtn = postOverlay
+                    .getByRole('button', { name: /dong|đóng|close|huy|hủy|x/i })
+                    .or(postOverlay.locator('button[aria-label], button[title]').first())
+                    .first();
+                if (await closeBtn.isVisible().catch(() => false)) {
+                    await closeBtn.click({ force: true }).catch(() => undefined);
+                }
+            }
+        }
     }
 
     private async dismissLocationOverlay(blockingOverlay: Locator): Promise<void> {
@@ -230,7 +250,7 @@ export class OrderFlowComponent {
             .getByText(/nguoi nhan|người nhận|so dien thoai|số điện thoại|de tro ly dat giup|để trợ lý đặt giúp/i)
             .first();
 
-        if (await orderFormMarker.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        if (await orderFormMarker.isVisible({ timeout: 5_000 }).catch(() => false)) {
             return;
         }
 
@@ -238,8 +258,31 @@ export class OrderFlowComponent {
             .getByRole('button', { name: /gio hang|giỏ hàng/i })
             .first();
 
-        if (await cartButton.isVisible({ timeout: 5_000 }).catch(() => false)) {
+        for (let attempt = 1; attempt <= 3; attempt += 1) {
+            if (await orderFormMarker.isVisible({ timeout: 2_000 }).catch(() => false)) {
+                return;
+            }
+
+            if (!(await cartButton.isVisible({ timeout: 5_000 }).catch(() => false))) {
+                return;
+            }
+
             await cartButton.click();
+
+            const dialogOpened = await this.page
+                .locator('[role="dialog"]')
+                .last()
+                .isVisible({ timeout: 5_000 })
+                .catch(() => false);
+
+            if (
+                dialogOpened ||
+                (await orderFormMarker.isVisible({ timeout: 3_000 }).catch(() => false))
+            ) {
+                return;
+            }
+
+            await this.page.waitForTimeout(1_000);
         }
     }
 
@@ -281,7 +324,6 @@ export class OrderFlowComponent {
     private firstProductResult(): Locator {
         return this.page
             .locator('[role="option"], [data-testid*="product"], a, button, li')
-            .filter({ hasText: /bia|tiger|crystal/i })
             .first();
     }
 

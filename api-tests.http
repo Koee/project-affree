@@ -1,0 +1,43 @@
+### 1. Costco - Cào theo danh mục (Category)
+POST http://localhost:3001/claw-costco/crawl
+Content-Type: application/json
+
+{
+    "categoryUrl": "https://www.costco.com/sun-care.html",
+    "category": "sun-care"
+}
+
+###
+
+### 2. Costco - Cào trực tiếp 1 sản phẩm chi tiết (PDP)
+POST http://localhost:3001/claw-data/crawl
+Content-Type: application/json
+
+{
+    "store": "costco",
+    "source": "manual",
+    "productUrl": "https://www.costco.com/p/-/qunol-plus-coq10-ubiquinol-200-mg-with-omega-3-90-softgels/100301666?sp=grs&langId=-1"
+}
+
+###
+
+### 3. Walmart - Cào theo danh mục (Category) thông qua OpenClaw
+POST http://localhost:3001/claw-data/crawl
+Content-Type: application/json
+
+{
+    "store": "walmart",
+    "source": "manual",
+    "categoryUrl": "https://www.walmart.com/browse/beauty/sun-care/1085666_1001550_1001551",
+    "category": "sun-care"
+}
+
+###
+
+### 4. Kiểm tra trạng thái cào (Status) của Costco
+GET http://localhost:3001/claw-costco/status
+
+###
+
+### 5. Lấy danh sách sản phẩm cào được gần nhất từ Costco
+GET http://localhost:3001/claw-costco/products?limit=5

@@ -1,5 +1,0 @@
-1.setup env = $env:TEST_ENV="staging"
-2.check env = echo $env:TEST_ENV or $env:TEST_ENV
-3.list  = ENV Get-ChildItem Env:
-4.riêng = Get-ChildItem Env:TEST_ENV 
-

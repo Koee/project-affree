@@ -1,7 +1,9 @@
 import type { CrawlAgent } from '../agent/types';
+import { OpenClawAgent } from '../agent/open-claw-agent';
 import type { ClawCostcoConfig } from '../config/env';
 import { logger } from '../logger';
 import { runWithRetry } from './retry';
+import { SchedulerFactory } from './scheduler-factory';
 
 export type CostcoScheduledTask = {
     start(): void;
@@ -28,48 +30,36 @@ export function intervalToCronExpression(interval: string): string {
 }
 
 export async function scheduleCostcoCrawl(
-    agent: CrawlAgent,
-    config: ClawCostcoConfig
+    agent: CrawlAgent | OpenClawAgent,
+    config: ClawCostcoConfig,
+    stores: string[] = ['costco']
 ): Promise<CostcoScheduledTask> {
-    const cron = await import('node-cron');
-
     if (!config.schedulerEnabled) {
         return {
             start: () => {
-                logger.info({ store: 'costco' }, 'Costco scheduler is disabled');
+                logger.info({ stores }, 'Scheduler is disabled');
             },
             stop: () => undefined,
         };
     }
 
-    return cron.createTask(
-        intervalToCronExpression(config.crawlInterval),
-        async () => {
-            logger.info({ store: 'costco' }, 'Starting scheduled Costco crawl');
-            await runWithRetry(
-                () =>
-                    agent.runCostcoCrawl({
-                        source: 'scheduler',
-                        categoryUrl: config.categoryUrl,
-                        category: config.category,
-                        productName: config.productName,
-                        productUrl: config.productUrl,
-                    }),
-                {
-                    retries: config.crawlRetry,
-                    delayMs: config.crawlRetryDelayMs,
-                    onRetry: ({ attempt, error }) => {
-                        logger.warn(
-                            {
-                                store: 'costco',
-                                attempt,
-                                error: error.message,
-                            },
-                            'Retrying scheduled Costco crawl'
-                        );
-                    },
-                }
-            );
-        }
+    const tasks = await Promise.all(
+        stores.map(async (store) => {
+            const storeScheduler = SchedulerFactory.create(store, agent, config);
+            return storeScheduler.createTask();
+        })
     );
+
+    return {
+        start: () => {
+            for (const task of tasks) {
+                task.start();
+            }
+        },
+        stop: () => {
+            for (const task of tasks) {
+                task.stop();
+            }
+        },
+    };
 }

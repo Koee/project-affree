@@ -21,9 +21,9 @@
         "fixtures/**/*.ts",
         "utils/**/*.ts",
         "tests/**/*.ts",
-        "schemas/**/*.ts",
         "claw-costco/**/*.ts",
         "claw-data-costco/**/*.ts",
+        "src/**/*.ts",
         "playwright.config.ts",
         "components/location.component.ts"
     ],
